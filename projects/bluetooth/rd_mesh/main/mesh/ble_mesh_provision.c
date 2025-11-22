@@ -584,7 +584,7 @@ static int my_cfg_mod_app_bind(int i, uint16_t net_idx, uint16_t addr, uint16_t 
     uint8_t status = 0;
     err = bt_mesh_cfg_mod_app_bind(s_netkey_idx, s_provisioner_ctx[i].peer_addr,
                                    s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-                                   BT_MESH_MODEL_ID_GEN_ONOFF_SRV, &status);
+                                   mod_id, &status);
 
     if (err)
     {
@@ -612,7 +612,7 @@ static int my_cfg_mod_app_bind_vnd(int i, uint16_t net_idx, uint16_t addr, uint1
     uint8_t status = 0;
     err = bt_mesh_cfg_mod_app_bind_vnd(s_netkey_idx, s_provisioner_ctx[i].peer_addr,
                                        s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-                                       BT_MESH_MODEL_ID_GEN_ONOFF_SRV, cid, &status);
+                                       mod_id, cid, &status);
 
     if (err)
     {
@@ -684,12 +684,12 @@ static int32_t do_add_appkey_cb(void *arg)
         return -1;
     }
 
-    // if(my_cfg_mod_app_bind_vnd(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
-    //                    s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-    //                    RD_VND_MODEL_SERVER, RD_VENDOR_ID) != 0)
-    // {
-    //     return -1;
-    // }
+    if (my_cfg_mod_app_bind_vnd(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
+                                s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+                                RD_VND_MODEL_SERVER, RD_VENDOR_ID) != 0)
+    {
+        return -1;
+    }
 
     BT_WARN("bind success, %02X:%02X:%02X:%02X:%02X:%02X addr %d appaddr %d",
             s_provisioner_ctx[i].peer_uuid_mac[5],
