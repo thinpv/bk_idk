@@ -1,17 +1,16 @@
 #pragma once
 
-#define PROVISION_TYPE_WHEN_INIT 1
-#define PROVISION_TYPE_MANUAL 2
-#define PROVISION_TYPE_AUTO 3
+#define RD_VENDOR_ID 0x0211
+#define RD_VND_MODEL_CLIENT 0x0000
+#define RD_VND_MODEL_SERVER 0x0001
 
-//#define PROVISION_TYPE PROVISION_TYPE_WHEN_INIT
+#define BT_MESH_MODEL_OP_4(b0, cid) ((((b0) << 16) | 0xE20000) | (cid))            ///< Get opcode of Vendor Model
+#define RD_VND_MODEL_OP_SEND_E2 BT_MESH_MODEL_OP_4(0x00, RD_VENDOR_ID)   ///< SEND Opcode of Vendor Model
+#define RD_VND_MODEL_OP_STATUS_E2 BT_MESH_MODEL_OP_4(0x01, RD_VENDOR_ID) ///< STATUS Opcode Send of Vendor Model
 
-
-
-#define BEKEN_VND_COMPANY_ID 0x0211
-#define BEKEN_VND_MODEL_COUNT_CLIENT 0x0000
-#define BEKEN_VND_MODEL_COUNT_SERVER 0x0001
-
+#define BT_MESH_MODEL_OP_5(b0, cid) ((((b0) << 16) | 0xE00000) | (cid))            ///< Get Opcode of Vendor Model
+#define RD_VND_MODEL_OP_SEND_E0 BT_MESH_MODEL_OP_5(0x00, RD_VENDOR_ID)   ///< SEND Opcode of Vendor Model
+#define RD_VND_MODEL_OP_STATUS_E0 BT_MESH_MODEL_OP_5(0x01, RD_VENDOR_ID) ///< STATUS Opcode Send of Vendor Model
 
 enum
 {
@@ -20,8 +19,8 @@ enum
     PROVISION_ROLE_PROVISIONEE,
 };
 
-#define BEKEN_VND_PROVISIONER_UUID_HEAD BEKEN_VND_COMPANY_ID & 0xff, (BEKEN_VND_COMPANY_ID >> 8) & 0xff, 0x00 + 1, 0xfe
-#define BEKEN_VND_PROVISIONEE_UUID_HEAD BEKEN_VND_COMPANY_ID & 0xff, (BEKEN_VND_COMPANY_ID >> 8) & 0xff, 0x00, 0xfe
+#define BEKEN_VND_PROVISIONER_UUID_HEAD RD_VENDOR_ID & 0xff, (RD_VENDOR_ID >> 8) & 0xff, 0x00 + 1, 0xfe
+#define BEKEN_VND_PROVISIONEE_UUID_HEAD RD_VENDOR_ID & 0xff, (RD_VENDOR_ID >> 8) & 0xff, 0x00, 0xfe
 
 enum
 {

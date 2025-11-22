@@ -18,31 +18,52 @@
 #include "components/bluetooth/bk_ble_types.h"
 #include "mesh/rpl.h"
 
-#define UINT8_TO_STREAM(p, u8)   do{*(p)++ = (uint8_t)(u8);} while(0)
-#define UINT16_TO_STREAM(p, u16) do{*(p)++ = (uint8_t)(u16); *(p)++ = (uint8_t)((u16) >> 8);} while(0)
-#define UINT32_TO_STREAM(p, u32) do{*(p)++ = (uint8_t)(u32); *(p)++ = (uint8_t)((u32) >> 8); *(p)++ = (uint8_t)((u32) >> 16); *(p)++ = (uint8_t)((u32) >> 24);} while(0)
-#define ARRAY_TO_STREAM(p, s, size) do{memcpy(p, s, size); p+= size; } while(0)
-#define ARRAY_TO_STREAM_REV(p, s, size) do{for(size_t i = 0; i < size; i++) {p[i] = s[size - i - 1];  } p += size; } while(0)
+#define UINT8_TO_STREAM(p, u8)  \
+    do                          \
+    {                           \
+        *(p)++ = (uint8_t)(u8); \
+    } while (0)
+#define UINT16_TO_STREAM(p, u16)        \
+    do                                  \
+    {                                   \
+        *(p)++ = (uint8_t)(u16);        \
+        *(p)++ = (uint8_t)((u16) >> 8); \
+    } while (0)
+#define UINT32_TO_STREAM(p, u32)         \
+    do                                   \
+    {                                    \
+        *(p)++ = (uint8_t)(u32);         \
+        *(p)++ = (uint8_t)((u32) >> 8);  \
+        *(p)++ = (uint8_t)((u32) >> 16); \
+        *(p)++ = (uint8_t)((u32) >> 24); \
+    } while (0)
+#define ARRAY_TO_STREAM(p, s, size) \
+    do                              \
+    {                               \
+        memcpy(p, s, size);         \
+        p += size;                  \
+    } while (0)
+#define ARRAY_TO_STREAM_REV(p, s, size)   \
+    do                                    \
+    {                                     \
+        for (size_t i = 0; i < size; i++) \
+        {                                 \
+            p[i] = s[size - i - 1];       \
+        }                                 \
+        p += size;                        \
+    } while (0)
 
-
-#define OP_ONOFF_GET       BT_MESH_MODEL_OP_2(0x82, 0x01)
-#define OP_ONOFF_SET       BT_MESH_MODEL_OP_2(0x82, 0x02)
+#define OP_ONOFF_GET BT_MESH_MODEL_OP_2(0x82, 0x01)
+#define OP_ONOFF_SET BT_MESH_MODEL_OP_2(0x82, 0x02)
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
-#define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
-
-#define OP_VND_SET_COUNT BT_MESH_MODEL_OP_3(0x01, BEKEN_VND_COMPANY_ID)
-#define OP_VND_SET_COUNT_UNACK BT_MESH_MODEL_OP_3(0x02, BEKEN_VND_COMPANY_ID)
-#define OP_VND_COUNT_STATUS BT_MESH_MODEL_OP_3(0x03, BEKEN_VND_COMPANY_ID)
-
+#define OP_ONOFF_STATUS BT_MESH_MODEL_OP_2(0x82, 0x04)
 
 #define ceiling_fraction(numerator, divider) (((numerator) + ((divider) - 1)) / (divider))
 
 extern ble_err_t bk_bluetooth_get_address(uint8_t *mac);
 static struct k_work button_work;
-static struct k_work_delayable send_count_work;
-static uint32_t send_count_inter = 0;
 
-//static uint16_t current_dev_addr = BT_MESH_ADDR_UNASSIGNED;
+// static uint16_t current_dev_addr = BT_MESH_ADDR_UNASSIGNED;
 
 struct provision_ctx_struct
 {
@@ -50,8 +71,7 @@ struct provision_ctx_struct
     uint16_t local_addr;
     uint16_t net_idx;
     uint16_t netkey_idx;
-} s_provision_ctx =
-{
+} s_provision_ctx = {
     .local_addr = BT_MESH_ADDR_UNASSIGNED,
 };
 
@@ -62,8 +82,7 @@ struct provisioner_ctx_struct
     uint32_t recv_count;
 
     uint8_t peer_uuid_mac[6];
-} s_provisioner_ctx[20] =
-{
+} s_provisioner_ctx[20] = {
     {PROVISION_STATUS_IDLE, 2, 0},
     {PROVISION_STATUS_IDLE, 3, 0},
     {PROVISION_STATUS_IDLE, 4, 0},
@@ -86,14 +105,12 @@ struct provisioner_ctx_struct
     {PROVISION_STATUS_IDLE, 21, 0},
 };
 
-//static uint8_t provision_type = PROVISION_TYPE_WHEN_INIT;
 static uint32_t client_send_count = 0;
 
-//static uint16_t s_app_idx = 0;
+// static uint16_t s_app_idx = 0;
 static uint16_t s_appkey_idx = 0;
 static uint16_t s_net_idx = 0;
 static uint16_t s_netkey_idx = 0;
-
 
 static uint8_t dev_uuid[16] = {BEKEN_VND_PROVISIONEE_UUID_HEAD, 0};
 const static uint8_t provisioner_uuid[16] = {BEKEN_VND_PROVISIONER_UUID_HEAD, 0};
@@ -101,11 +118,9 @@ const static uint8_t provisionee_uuid[16] = {BEKEN_VND_PROVISIONEE_UUID_HEAD, 0}
 
 static uint8_t provision_role = PROVISION_ROLE_UNKNOW;
 
-
 static uint8_t net_key[16] = {1, 0};
 static uint8_t dev_key[16] = {0};
 static uint8_t app_key[16] = {0};
-
 
 static void board_led_set_int(void)
 {
@@ -126,7 +141,6 @@ static void board_output_number(bt_mesh_output_action_t action, uint32_t number)
     BT_ERR("%d %d", action, number);
 }
 
-
 static void attention_on(struct bt_mesh_model *mod)
 {
     BT_ERR("");
@@ -139,20 +153,18 @@ static void attention_off(struct bt_mesh_model *mod)
     board_led_set(false);
 }
 
-static const struct bt_mesh_health_srv_cb health_cb =
-{
+static const struct bt_mesh_health_srv_cb health_cb = {
     .attn_on = attention_on,
     .attn_off = attention_off,
 };
 
-static struct bt_mesh_health_srv health_srv =
-{
+static struct bt_mesh_health_srv health_srv = {
     .cb = &health_cb,
 };
 
 BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 
-static const char *const onoff_str[] = { "off", "on" };
+static const char *const onoff_str[] = {"off", "on"};
 
 static struct
 {
@@ -172,8 +184,7 @@ static struct
  * 2: 10 s
  * 3: 20 min
  */
-static const uint32_t time_res[] =
-{
+static const uint32_t time_res[] = {
     100,
     MSEC_PER_SEC,
     10 * MSEC_PER_SEC,
@@ -266,170 +277,6 @@ static void onoff_timeout(struct k_work *work)
     board_led_set(onoff.val);
 }
 
-/* Generic OnOff Server message handlers */
-
-static int gen_onoff_get(struct bt_mesh_model *model,
-                         struct bt_mesh_msg_ctx *ctx,
-                         struct net_buf_simple *buf)
-{
-    onoff_status_send(model, ctx);
-    return 0;
-}
-
-static int gen_onoff_set_unack(struct bt_mesh_model *model,
-                               struct bt_mesh_msg_ctx *ctx,
-                               struct net_buf_simple *buf)
-{
-    uint8_t val = net_buf_simple_pull_u8(buf);
-    uint8_t tid = net_buf_simple_pull_u8(buf);
-    int32_t trans = 0;
-    int32_t delay = 0;
-
-    if (buf->len)
-    {
-        trans = model_time_decode(net_buf_simple_pull_u8(buf));
-        delay = net_buf_simple_pull_u8(buf) * 5;
-    }
-
-    /* Only perform change if the message wasn't a duplicate and the
-     * value is different.
-     */
-    if (tid == onoff.tid && ctx->addr == onoff.src)
-    {
-        /* Duplicate */
-        return 0;
-    }
-
-    if (val == onoff.val)
-    {
-        /* No change */
-        return 0;
-    }
-
-    BT_ERR("set: %s delay: %d ms time: %d ms click_count %d\n", onoff_str[val], delay, trans);
-
-    onoff.tid = tid;
-    onoff.src = ctx->addr;
-    onoff.val = val;
-    onoff.transition_time = trans;
-
-    /* Schedule the next action to happen on the delay, and keep
-     * transition time stored, so it can be applied in the timeout.
-     */
-    k_work_reschedule(&onoff.work, K_MSEC(delay));
-
-    return 0;
-}
-
-static int gen_onoff_set(struct bt_mesh_model *model,
-                         struct bt_mesh_msg_ctx *ctx,
-                         struct net_buf_simple *buf)
-{
-    (void)gen_onoff_set_unack(model, ctx, buf);
-    onoff_status_send(model, ctx);
-
-    return 0;
-}
-
-
-static int vnd_srv_count_status_send(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx, uint32_t peer_count)
-{
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_VND_COUNT_STATUS, 10);
-    bt_mesh_model_msg_init(&buf, OP_VND_COUNT_STATUS);
-
-    net_buf_simple_add_le32(&buf, peer_count);
-    net_buf_simple_add_le32(&buf, onoff.count_value);
-
-    return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
-}
-
-
-static int vnd_srv_set_count_unack(struct bt_mesh_model *model,
-                                   struct bt_mesh_msg_ctx *ctx,
-                                   struct net_buf_simple *buf)
-{
-    uint32_t val = net_buf_simple_pull_le32(buf);
-    uint8_t tid = net_buf_simple_pull_u8(buf);
-    int32_t trans = 0;
-    int32_t delay = 0;
-
-    (void)(delay);
-    if (buf->len)
-    {
-        trans = model_time_decode(net_buf_simple_pull_u8(buf));
-        delay = net_buf_simple_pull_u8(buf) * 5;
-    }
-
-    if (tid == onoff.tid && ctx->addr == onoff.src)
-    {
-        /* Duplicate */
-        BT_WARN("dup, tid %d addr %d", tid, ctx->addr);
-        return 0;
-    }
-
-    onoff.tid = tid;
-    onoff.src = ctx->addr;
-    onoff.transition_time = trans;
-    onoff.count_value++;
-
-    BT_WARN("peer count %d recv all count %d", val, onoff.count_value);
-    board_led_set_int();
-    return 0;
-}
-
-
-static int vnd_srv_set_count(struct bt_mesh_model *model,
-                             struct bt_mesh_msg_ctx *ctx,
-                             struct net_buf_simple *buf)
-{
-    uint32_t peer_count = net_buf_simple_pull_le32(buf);
-    uint8_t tid = net_buf_simple_pull_u8(buf);
-    int32_t trans = 0;
-    int32_t delay = 0;
-    (void)(delay);
-
-    if (buf->len)
-    {
-        trans = model_time_decode(net_buf_simple_pull_u8(buf));
-        delay = net_buf_simple_pull_u8(buf) * 5;
-    }
-
-    if (tid == onoff.tid && ctx->addr == onoff.src)
-    {
-        BT_WARN("dup, tid %d addr %d", tid, ctx->addr);
-        return 0;
-    }
-
-    onoff.tid = tid;
-    onoff.src = ctx->addr;
-    onoff.transition_time = trans;
-    onoff.count_value++;
-
-    BT_WARN("peer count %d server recv count %d", peer_count, onoff.count_value);
-    board_led_set_int();
-
-    //    vnd_srv_set_count_unack(model, ctx, buf);
-    vnd_srv_count_status_send(model, ctx, peer_count);
-
-    return 0;
-}
-
-
-// static const struct bt_mesh_model_op gen_onoff_srv_op[] =
-// {
-//     { OP_ONOFF_GET,       BT_MESH_LEN_EXACT(0), gen_onoff_get },
-//     { OP_ONOFF_SET,       BT_MESH_LEN_MIN(2),   gen_onoff_set },
-//     { OP_ONOFF_SET_UNACK, BT_MESH_LEN_MIN(2),   gen_onoff_set_unack },
-//     BT_MESH_MODEL_OP_END,
-// };
-
-static const struct bt_mesh_model_op vnd_srv_op[] =
-{
-    { OP_VND_SET_COUNT, BT_MESH_LEN_MIN(5), vnd_srv_set_count},
-    { OP_VND_SET_COUNT_UNACK, BT_MESH_LEN_MIN(5), vnd_srv_set_count_unack},
-    BT_MESH_MODEL_OP_END,
-};
-
 /* Generic OnOff Client */
 
 static int gen_onoff_status(struct bt_mesh_model *model,
@@ -453,10 +300,11 @@ static int gen_onoff_status(struct bt_mesh_model *model,
     return 0;
 }
 
-static int vnd_cli_count_status(struct bt_mesh_model *model,
-                                struct bt_mesh_msg_ctx *ctx,
-                                struct net_buf_simple *buf)
+static int vnd_cli_status_e0(struct bt_mesh_model *model,
+                             struct bt_mesh_msg_ctx *ctx,
+                             struct net_buf_simple *buf)
 {
+    BT_ERR("vnd_cli_status_e0");
     uint32_t peer_our_send_count = net_buf_simple_pull_le32(buf);
     uint32_t peer_recv_count = net_buf_simple_pull_le32(buf);
 
@@ -482,15 +330,15 @@ static int vnd_cli_count_status(struct bt_mesh_model *model,
             s_provisioner_ctx[i].recv_count++;
 
             BT_ERR("ble:W(%d):remote %02X:%02X:%02X:%02X:%02X:%02X mesh %d, we send %d, we recv %d, peer recv %d\n",
-                      rtos_get_time(),
-                      s_provisioner_ctx[i].peer_uuid_mac[5],
-                      s_provisioner_ctx[i].peer_uuid_mac[4],
-                      s_provisioner_ctx[i].peer_uuid_mac[3],
-                      s_provisioner_ctx[i].peer_uuid_mac[2],
-                      s_provisioner_ctx[i].peer_uuid_mac[1],
-                      s_provisioner_ctx[i].peer_uuid_mac[0],
-                      ctx->addr,
-                      client_send_count, s_provisioner_ctx[i].recv_count, peer_recv_count);
+                   rtos_get_time(),
+                   s_provisioner_ctx[i].peer_uuid_mac[5],
+                   s_provisioner_ctx[i].peer_uuid_mac[4],
+                   s_provisioner_ctx[i].peer_uuid_mac[3],
+                   s_provisioner_ctx[i].peer_uuid_mac[2],
+                   s_provisioner_ctx[i].peer_uuid_mac[1],
+                   s_provisioner_ctx[i].peer_uuid_mac[0],
+                   ctx->addr,
+                   client_send_count, s_provisioner_ctx[i].recv_count, peer_recv_count);
 
             break;
         }
@@ -499,26 +347,22 @@ static int vnd_cli_count_status(struct bt_mesh_model *model,
     return 0;
 }
 
-
-static const struct bt_mesh_model_op gen_onoff_cli_op[] =
-{
+static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
     {OP_ONOFF_STATUS, BT_MESH_LEN_MIN(1), gen_onoff_status},
     BT_MESH_MODEL_OP_END,
 };
 
-static const struct bt_mesh_model_op vnd_cli_op[] =
-{
-    {OP_VND_COUNT_STATUS, BT_MESH_LEN_MIN(5), vnd_cli_count_status},
+static const struct bt_mesh_model_op vnd_cli_op[] = {
+    {RD_VND_MODEL_OP_STATUS_E0, BT_MESH_LEN_MIN(5), vnd_cli_status_e0},
+    {RD_VND_MODEL_OP_STATUS_E2, BT_MESH_LEN_MIN(5), vnd_cli_status_e0},
     BT_MESH_MODEL_OP_END,
 };
 
 static struct bt_mesh_cfg_cli cfg_cli =
-{
-};
+    {};
 
 /* This application only needs one element to contain its models */
-static struct bt_mesh_model models[] =
-{
+static struct bt_mesh_model models[] = {
     BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL_CFG_CLI(&cfg_cli),
     BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
@@ -526,19 +370,15 @@ static struct bt_mesh_model models[] =
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL, NULL),
 };
 
-static struct bt_mesh_model vnd_models[] =
-{
-    BT_MESH_MODEL_VND(BEKEN_VND_COMPANY_ID, BEKEN_VND_MODEL_COUNT_SERVER, vnd_srv_op, NULL, NULL),
-    BT_MESH_MODEL_VND(BEKEN_VND_COMPANY_ID, BEKEN_VND_MODEL_COUNT_CLIENT, vnd_cli_op, NULL, NULL),
+static struct bt_mesh_model vnd_models[] = {
+    BT_MESH_MODEL_VND(RD_VENDOR_ID, RD_VND_MODEL_CLIENT, vnd_cli_op, NULL, NULL),
 };
 
-static struct bt_mesh_elem elements[] =
-{
+static struct bt_mesh_elem elements[] = {
     BT_MESH_ELEM(0, models, vnd_models),
 };
 
-static const struct bt_mesh_comp comp =
-{
+static const struct bt_mesh_comp comp = {
     .cid = BT_COMP_ID_LF,
     .elem = elements,
     .elem_count = ARRAY_SIZE(elements),
@@ -578,7 +418,7 @@ static void deprovision_device_inter(uint16_t addr)
         bt_mesh_cdb_node_del(node, true);
     }
 
-    //this is a unsafe perform, you will under replay attack !! Dont't do it unless debug !!!
+    // this is a unsafe perform, you will under replay attack !! Dont't do it unless debug !!!
     bt_mesh_rpl_clear();
 }
 
@@ -587,7 +427,7 @@ static void deprovision_device(uint8_t *mac)
     for (uint8_t i = 0; i < sizeof(s_provisioner_ctx) / sizeof(s_provisioner_ctx[0]); ++i)
     {
         if (s_provisioner_ctx[i].status == PROVISION_STATUS_PROVISION_COMPL &&
-                0 == memcmp(mac, s_provisioner_ctx[i].peer_uuid_mac, sizeof(s_provisioner_ctx[i].peer_uuid_mac)))
+            0 == memcmp(mac, s_provisioner_ctx[i].peer_uuid_mac, sizeof(s_provisioner_ctx[i].peer_uuid_mac)))
         {
             deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
             reset_device_ctx(i);
@@ -612,7 +452,6 @@ static uint8_t is_provisioning(void)
     return 0;
 }
 
-
 static int user_output_number(bt_mesh_output_action_t action, uint32_t number)
 {
     BT_ERR("OOB Number: %u 0x%0x\n", number, action);
@@ -621,7 +460,6 @@ static int user_output_number(bt_mesh_output_action_t action, uint32_t number)
 
     return 0;
 }
-
 
 static void user_prov_reset(void)
 {
@@ -645,16 +483,16 @@ static void user_unprovisioned_beacon(uint8_t uuid[16],
         }
 
         // if (0 == memcmp(uuid, provisionee_uuid, 4))
-				if(uuid[14] == 0x28 && uuid[15] == 0x04) //RAL
+        if (uuid[14] == 0x28 && uuid[15] == 0x04) // RAL
         {
             uint32_t i = 0;
 
             for (i = 0; i < sizeof(s_provisioner_ctx) / sizeof(s_provisioner_ctx[0]); ++i)
             {
                 if (s_provisioner_ctx[i].status != PROVISION_STATUS_IDLE &&
-                        0 == memcmp(s_provisioner_ctx[i].peer_uuid_mac, uuid + 4, sizeof(s_provisioner_ctx[i].peer_uuid_mac)))
+                    0 == memcmp(s_provisioner_ctx[i].peer_uuid_mac, uuid + 4, sizeof(s_provisioner_ctx[i].peer_uuid_mac)))
                 {
-                    //already provision
+                    // already provision
                     BT_WARN("already provision, %02X:%02X:%02X:%02X:%02X:%02X status %d",
                             s_provisioner_ctx[i].peer_uuid_mac[5],
                             s_provisioner_ctx[i].peer_uuid_mac[4],
@@ -677,7 +515,7 @@ static void user_unprovisioned_beacon(uint8_t uuid[16],
 
             if (i >= sizeof(s_provisioner_ctx) / sizeof(s_provisioner_ctx[0]))
             {
-                //prov is full, ignore
+                // prov is full, ignore
                 BT_WARN("provision is full, ignore");
                 return;
             }
@@ -695,7 +533,7 @@ static void user_unprovisioned_beacon(uint8_t uuid[16],
                 return;
             }
 
-            //todo: log "Public keys are identical", indicate same dhkey
+            // todo: log "Public keys are identical", indicate same dhkey
         }
     }
 }
@@ -707,7 +545,6 @@ static void user_prov_complete(uint16_t netkey_idx, uint16_t addr)
     s_provision_ctx.netkey_idx = netkey_idx;
 }
 
-
 static void user_prov_node_added(uint16_t netkey_idx, uint8_t uuid[16], uint16_t addr,
                                  uint8_t num_elem)
 {
@@ -718,13 +555,12 @@ static void user_prov_node_added(uint16_t netkey_idx, uint8_t uuid[16], uint16_t
         for (uint32_t i = 0; i < sizeof(s_provisioner_ctx) / sizeof(s_provisioner_ctx[0]); ++i)
         {
             if (0 == memcmp(s_provisioner_ctx[i].peer_uuid_mac, uuid + 4, sizeof(s_provisioner_ctx[i].peer_uuid_mac)) &&
-                    s_provisioner_ctx[i].status == PROVISION_STATUS_PROVISIONING &&
-                    addr == s_provisioner_ctx[i].peer_addr)
+                s_provisioner_ctx[i].status == PROVISION_STATUS_PROVISIONING &&
+                addr == s_provisioner_ctx[i].peer_addr)
             {
                 BT_WARN("success, mac %02X:%02X:%02X:%02X:%02X:%02X addr %d i %d", uuid[9], uuid[8], uuid[7], uuid[6], uuid[5], uuid[4],
                         addr, i);
                 s_provisioner_ctx[i].status = PROVISION_STATUS_WAIT_CLOSE;
-
 
                 return;
             }
@@ -739,9 +575,62 @@ static void user_prov_node_added(uint16_t netkey_idx, uint8_t uuid[16], uint16_t
     //        current_dev_addr = prov_addr_index++;
     //        //  k_sem_give(&prov_sem);
     //    }
+}
 
+static int my_cfg_mod_app_bind(int i, uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
+                               uint16_t mod_app_idx, uint16_t mod_id)
+{
+    int err = 0;
+    uint8_t status = 0;
+    err = bt_mesh_cfg_mod_app_bind(s_netkey_idx, s_provisioner_ctx[i].peer_addr,
+                                   s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+                                   BT_MESH_MODEL_ID_GEN_ONOFF_SRV, &status);
 
+    if (err)
+    {
+        BT_ERR("Unable to send Model App Bind (err %d)", err);
+        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
+        reset_device_ctx(i);
+        return -1;
+    }
 
+    if (status)
+    {
+        BT_ERR("Model App Bind failed with status 0x%02x", status);
+        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
+        reset_device_ctx(i);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int my_cfg_mod_app_bind_vnd(int i, uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
+                                   uint16_t mod_app_idx, uint16_t mod_id, uint16_t cid)
+{
+    int err = 0;
+    uint8_t status = 0;
+    err = bt_mesh_cfg_mod_app_bind_vnd(s_netkey_idx, s_provisioner_ctx[i].peer_addr,
+                                       s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+                                       BT_MESH_MODEL_ID_GEN_ONOFF_SRV, cid, &status);
+
+    if (err)
+    {
+        BT_ERR("Unable to send Model App Bind (err %d)", err);
+        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
+        reset_device_ctx(i);
+        return -1;
+    }
+
+    if (status)
+    {
+        BT_ERR("Model App Bind failed with status 0x%02x", status);
+        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
+        reset_device_ctx(i);
+        return -1;
+    }
+
+    return 0;
 }
 
 static int32_t do_add_appkey_cb(void *arg)
@@ -752,12 +641,11 @@ static int32_t do_add_appkey_cb(void *arg)
 
     s_provisioner_ctx[i].status = PROVISION_STATUS_PROVISION_COMPL;
 
-
     models[2].keys[0] = s_appkey_idx;
     models[3].keys[0] = s_appkey_idx;
 
     vnd_models[0].keys[0] = s_appkey_idx;
-    vnd_models[1].keys[0] = s_appkey_idx;
+    // vnd_models[1].keys[0] = s_appkey_idx;
 
     BT_WARN("%d", i);
 
@@ -781,7 +669,6 @@ static int32_t do_add_appkey_cb(void *arg)
 
     BT_WARN("AppKey send, NetKeyIndex 0x%04x AppKeyIndex 0x%04x", s_netkey_idx, s_appkey_idx);
 
-
     err = bt_mesh_app_key_add(s_appkey_idx, s_netkey_idx, app_key);
 
     if (err)
@@ -790,27 +677,19 @@ static int32_t do_add_appkey_cb(void *arg)
         return -1;
     }
 
-    status = 0;
-
-    err = bt_mesh_cfg_mod_app_bind(s_netkey_idx, s_provisioner_ctx[i].peer_addr,
-                                       s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-                                       BT_MESH_MODEL_ID_GEN_ONOFF_SRV, &status);
-
-    if (err)
+    if (my_cfg_mod_app_bind(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
+                            s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+                            BT_MESH_MODEL_ID_GEN_ONOFF_SRV) != 0)
     {
-        BT_ERR("Unable to send Model App Bind (err %d)", err);
-        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
-        reset_device_ctx(i);
         return -1;
     }
 
-    if (status)
-    {
-        BT_ERR("Model App Bind failed with status 0x%02x", status);
-        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
-        reset_device_ctx(i);
-        return -1;
-    }
+    // if(my_cfg_mod_app_bind_vnd(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
+    //                    s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+    //                    RD_VND_MODEL_SERVER, RD_VENDOR_ID) != 0)
+    // {
+    //     return -1;
+    // }
 
     BT_WARN("bind success, %02X:%02X:%02X:%02X:%02X:%02X addr %d appaddr %d",
             s_provisioner_ctx[i].peer_uuid_mac[5],
@@ -846,25 +725,22 @@ static void user_link_close(bt_mesh_prov_bearer_t bearer)
     }
 }
 
-static const struct bt_mesh_prov prov =
-{
+static const struct bt_mesh_prov prov = {
     .uuid = dev_uuid,
     .output_size = 4,
     .output_actions = BT_MESH_DISPLAY_NUMBER,
     .output_number = user_output_number,
     .reset = user_prov_reset,
     .unprovisioned_beacon = user_unprovisioned_beacon,
-    .complete = user_prov_complete, //provisioner self/ provisionee callback
-    .node_added = user_prov_node_added, //provisioner callback
+    .complete = user_prov_complete,     // provisioner self/ provisionee callback
+    .node_added = user_prov_node_added, // provisioner callback
     .link_close = user_link_close,
 };
-
 
 /** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
 static int gen_onoff_send(bool val)
 {
-    struct bt_mesh_msg_ctx ctx =
-    {
+    struct bt_mesh_msg_ctx ctx = {
         .app_idx = models[3].keys[0], /* Use the bound key */
         .addr = BT_MESH_ADDR_ALL_NODES,
         .send_ttl = BT_MESH_TTL_DEFAULT,
@@ -886,43 +762,6 @@ static int gen_onoff_send(bool val)
 
     return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
-
-static void shell_send_click_count(struct k_work *work)
-{
-    struct bt_mesh_msg_ctx ctx =
-    {
-        .app_idx = vnd_models[1].keys[0], /* Use the bound key */
-        .addr = BT_MESH_ADDR_ALL_NODES,
-        .send_ttl = BT_MESH_TTL_DEFAULT,
-    };
-    static uint8_t tid;
-
-
-    if (ctx.app_idx == BT_MESH_KEY_UNUSED)
-    {
-        BT_ERR("The Generic OnOff Client must be bound to a key before sending 0x%X.", ctx.app_idx);
-        //        return;
-        ctx.app_idx = s_appkey_idx;
-    }
-
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_VND_SET_COUNT, 5);
-
-    client_send_count++;
-    bt_mesh_model_msg_init(&buf, OP_VND_SET_COUNT);
-    net_buf_simple_add_le32(&buf, client_send_count);
-    net_buf_simple_add_u8(&buf, tid++);
-
-    BT_WARN("Sending count %d", client_send_count);
-
-    //    bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
-    bt_mesh_model_send(&vnd_models[1], &ctx, &buf, NULL, NULL);
-
-    if (send_count_inter)
-    {
-        k_work_reschedule(CONTAINER_OF(work, struct k_work_delayable, work), (k_timeout_t) {send_count_inter});
-    }
-}
-
 
 static void setup_cdb(uint16_t netidx, uint16_t appidx)
 {
@@ -966,7 +805,6 @@ static void ble_mesh_provision_ready(int err)
 
         BT_ERR("Bluetooth init failed (err %d)", err);
         return;
-
     }
 
     BT_WARN("Bluetooth initialized");
@@ -1015,13 +853,11 @@ static void ble_mesh_provision_ready(int err)
     }
     else if (provision_role == PROVISION_ROLE_PROVISIONEE)
     {
-        bt_mesh_prov_enable(BT_MESH_PROV_ADV);// | BT_MESH_PROV_GATT);
+        bt_mesh_prov_enable(BT_MESH_PROV_ADV); // | BT_MESH_PROV_GATT);
     }
 
     BT_WARN("Mesh initialized");
-
 }
-
 
 static void bt_mesh_triggle_button(void)
 {
@@ -1036,7 +872,6 @@ int bt_mesh_provision_init(void)
     (void)index;
 
     k_work_init(&button_work, button_pressed);
-    k_work_init_delayable(&send_count_work, shell_send_click_count);
 
     if (err)
     {
@@ -1057,22 +892,21 @@ int bt_mesh_provision_init(void)
     return err;
 }
 
-
-//static void hexstring_to_array(uint8_t *out, uint32_t *out_len, char *buff, uint8_t len)
+// static void hexstring_to_array(uint8_t *out, uint32_t *out_len, char *buff, uint8_t len)
 //{
-//    char temp[3] = {0};
+//     char temp[3] = {0};
 //
-//    uint32_t i = 0, j = 0;
+//     uint32_t i = 0, j = 0;
 //
-//    for (i = 0; i < len && j < *out_len;)
-//    {
-//        memcpy(temp, buff + i, 2);
-//        i = i + 2;
-//        out[j++] = strtoul(temp, NULL, 16) & 0xFF;
-//    }
+//     for (i = 0; i < len && j < *out_len;)
+//     {
+//         memcpy(temp, buff + i, 2);
+//         i = i + 2;
+//         out[j++] = strtoul(temp, NULL, 16) & 0xFF;
+//     }
 //
-//    *out_len = j;
-//}
+//     *out_len = j;
+// }
 
 void bt_mesh_provision_shell(int32_t argc, char **argv)
 {
@@ -1136,8 +970,8 @@ void bt_mesh_provision_shell(int32_t argc, char **argv)
         uint8_t mac_final[6] = {0};
         uint32_t len = sizeof(mac);
         (void)(len);
-        //sscanf bug: cant detect uint8_t size point
-        ret = sscanf(argv[1], "%02x:%02x:%02x:%02x:%02x:%02x", //argv[1], "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+        // sscanf bug: cant detect uint8_t size point
+        ret = sscanf(argv[1], "%02x:%02x:%02x:%02x:%02x:%02x", // argv[1], "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
                      mac + 5,
                      mac + 4,
                      mac + 3,
@@ -1170,57 +1004,6 @@ void bt_mesh_provision_shell(int32_t argc, char **argv)
     {
         bt_mesh_triggle_button();
     }
-    else if (!strcasecmp(argv[0], "send_count"))
-    {
-        uint32_t intv = 0;
-
-        if (argc == 1)
-        {
-            if (send_count_inter)
-            {
-                BT_ERR("send timer is already set, cant single send !");
-
-                return;
-            }
-
-            k_work_reschedule(&send_count_work, (k_timeout_t) {0});
-        }
-
-        if (argc >= 2)
-        {
-            ret = sscanf(argv[1], "%u", &intv);
-
-            if (ret != 1)
-            {
-                BT_ERR("interv err !");
-                send_count_inter = 0;
-                return;
-            }
-
-            if (intv != 0 && intv < 1500)
-            {
-                BT_ERR("intv too short, at least 1500 ms !");
-                return;
-            }
-
-            if (send_count_inter && intv)
-            {
-                BT_ERR("interv is already set, set to 0 first !");
-                return;
-            }
-            else if (send_count_inter && intv == 0)
-            {
-                k_work_cancel_delayable(&send_count_work);
-                send_count_inter = 0;
-                BT_WARN("cancel send timer");
-                return;
-            }
-
-            BT_WARN("send count timer intv %d ms", intv);
-            send_count_inter = intv;
-            k_work_reschedule(&send_count_work, (k_timeout_t) {send_count_inter});
-        }
-    }
     else
     {
         BT_ERR("unknow cmd %s", argv[0]);
@@ -1228,4 +1011,3 @@ void bt_mesh_provision_shell(int32_t argc, char **argv)
 
     return;
 }
-
