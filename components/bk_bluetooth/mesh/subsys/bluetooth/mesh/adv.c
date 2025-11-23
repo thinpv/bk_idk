@@ -149,7 +149,7 @@ static void bt_mesh_scan_cb(const bt_addr_le_t *addr, int8_t rssi,
 			break;
 #endif
 		case BT_DATA_MESH_BEACON:
-			bt_mesh_beacon_recv(buf);
+			bt_mesh_beacon_recv(buf, addr);
 			break;
 		default:
 			break;

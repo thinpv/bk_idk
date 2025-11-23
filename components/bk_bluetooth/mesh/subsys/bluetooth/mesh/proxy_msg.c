@@ -108,7 +108,7 @@ static void proxy_complete_pdu(struct bt_mesh_proxy_role *role)
 		break;
 	case BT_MESH_PROXY_BEACON:
 		BT_DBG("Mesh Beacon PDU");
-		bt_mesh_beacon_recv(&role->buf);
+		bt_mesh_beacon_recv(&role->buf, NULL);
 		break;
 	case BT_MESH_PROXY_CONFIG:
 		BT_DBG("Mesh Configuration PDU");

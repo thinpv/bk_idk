@@ -179,7 +179,7 @@ static int unprovisioned_beacon_send(void)
 	return 0;
 }
 
-static void unprovisioned_beacon_recv(struct net_buf_simple *buf)
+static void unprovisioned_beacon_recv(struct net_buf_simple *buf, const bt_addr_le_t *addr)
 {
 	const struct bt_mesh_prov *prov;
 	uint8_t *uuid;
@@ -207,7 +207,8 @@ static void unprovisioned_beacon_recv(struct net_buf_simple *buf)
 	if (prov->unprovisioned_beacon) {
 		prov->unprovisioned_beacon(uuid,
 					   (bt_mesh_prov_oob_info_t)oob_info,
-					   uri_hash);
+					   uri_hash,
+					   addr);
 	}
 }
 
@@ -374,7 +375,7 @@ update_stats:
 	}
 }
 
-void bt_mesh_beacon_recv(struct net_buf_simple *buf)
+void bt_mesh_beacon_recv(struct net_buf_simple *buf, const bt_addr_le_t *addr)
 {
 	uint8_t type;
 
@@ -389,7 +390,7 @@ void bt_mesh_beacon_recv(struct net_buf_simple *buf)
 	switch (type) {
 	case BEACON_TYPE_UNPROVISIONED:
 		if (IS_ENABLED(CONFIG_BT_MESH_PB_ADV)) {
-			unprovisioned_beacon_recv(buf);
+			unprovisioned_beacon_recv(buf, addr);
 		}
 		break;
 	case BEACON_TYPE_SECURE:

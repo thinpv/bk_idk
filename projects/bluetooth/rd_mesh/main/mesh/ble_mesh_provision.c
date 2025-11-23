@@ -18,6 +18,9 @@
 #include "components/bluetooth/bk_ble_types.h"
 #include "mesh/rpl.h"
 
+#include "ble_mesh_vendor.h"
+#include "BleMeshDefine.h"
+
 #define UINT8_TO_STREAM(p, u8)  \
     do                          \
     {                           \
@@ -73,6 +76,19 @@ struct provision_ctx_struct
     uint16_t netkey_idx;
 } s_provision_ctx = {
     .local_addr = BT_MESH_ADDR_UNASSIGNED,
+};
+
+struct provisioner_ctx_struct2
+{
+    uint8_t status;
+    uint16_t peer_addr;
+    uint32_t recv_count;
+
+    uint8_t peer_uuid_mac[6];
+} scanning_device = {
+    .status = PROVISION_STATUS_IDLE,
+    .peer_addr = 0,
+    .recv_count = 0,
 };
 
 struct provisioner_ctx_struct
@@ -304,7 +320,41 @@ static int vnd_cli_status_e0(struct bt_mesh_model *model,
                              struct bt_mesh_msg_ctx *ctx,
                              struct net_buf_simple *buf)
 {
-    BT_ERR("vnd_cli_status_e0");
+    BT_ERR("vnd_cli_status_e0 addr 0x%04X", ctx->addr);
+    uint16_t header = net_buf_simple_pull_le16(buf);
+    BT_ERR("vnd_cli_status_e0 header 0x%04X", header);
+    if (header == RD_HEADER_PROVISION_SET_GW_ADDR)
+    {
+        BT_WARN("Received set_gw_addr response from 0x%04X", ctx->addr);
+        BT_WARN("scanning_device mac %02X:%02X:%02X:%02X:%02X:%02X",
+                    scanning_device.peer_uuid_mac[5],
+                    scanning_device.peer_uuid_mac[4],
+                    scanning_device.peer_uuid_mac[3],
+                    scanning_device.peer_uuid_mac[2],
+                    scanning_device.peer_uuid_mac[1],
+                    scanning_device.peer_uuid_mac[0]);
+        get_device_type(ctx->addr, scanning_device.peer_uuid_mac);
+    }
+    else if (header == RD_HEADER_PROVISION_GET_DEV_TYPE)
+    {
+        uint32_t deviceType;
+        uint8_t magic;
+        uint16_t version;
+
+        deviceType = net_buf_simple_pull_be24(buf);
+        magic = net_buf_simple_pull_u8(buf);
+        version = net_buf_simple_pull_le16(buf);
+        BT_WARN("Device Type: %08X, Magic: %02X, Version: %d", deviceType, magic, version);
+    }
+
+    return 0;
+}
+
+static int vnd_cli_status_e2(struct bt_mesh_model *model,
+                             struct bt_mesh_msg_ctx *ctx,
+                             struct net_buf_simple *buf)
+{
+    BT_ERR("vnd_cli_status_e2");
     uint32_t peer_our_send_count = net_buf_simple_pull_le32(buf);
     uint32_t peer_recv_count = net_buf_simple_pull_le32(buf);
 
@@ -353,8 +403,8 @@ static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
 };
 
 static const struct bt_mesh_model_op vnd_cli_op[] = {
-    {RD_VND_MODEL_OP_STATUS_E0, BT_MESH_LEN_MIN(5), vnd_cli_status_e0},
-    {RD_VND_MODEL_OP_STATUS_E2, BT_MESH_LEN_MIN(5), vnd_cli_status_e0},
+    {RD_VND_MODEL_OP_STATUS_E0, BT_MESH_LEN_MIN(2), vnd_cli_status_e0},
+    {RD_VND_MODEL_OP_STATUS_E2, BT_MESH_LEN_MIN(2), vnd_cli_status_e2},
     BT_MESH_MODEL_OP_END,
 };
 
@@ -362,7 +412,7 @@ static struct bt_mesh_cfg_cli cfg_cli =
     {};
 
 /* This application only needs one element to contain its models */
-static struct bt_mesh_model models[] = {
+struct bt_mesh_model models[] = {
     BT_MESH_MODEL_CFG_SRV,
     BT_MESH_MODEL_CFG_CLI(&cfg_cli),
     BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
@@ -370,7 +420,7 @@ static struct bt_mesh_model models[] = {
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL, NULL),
 };
 
-static struct bt_mesh_model vnd_models[] = {
+struct bt_mesh_model vnd_models[] = {
     BT_MESH_MODEL_VND(RD_VENDOR_ID, RD_VND_MODEL_CLIENT, vnd_cli_op, NULL, NULL),
 };
 
@@ -471,7 +521,8 @@ static void user_prov_reset(void)
 
 static void user_unprovisioned_beacon(uint8_t uuid[16],
                                       bt_mesh_prov_oob_info_t oob_info,
-                                      uint32_t *uri_hash)
+                                      uint32_t *uri_hash,
+                                      const bt_addr_le_t *addr)
 {
     if (provision_role == PROVISION_ROLE_PROVISIONER)
     {
@@ -520,10 +571,19 @@ static void user_unprovisioned_beacon(uint8_t uuid[16],
                 return;
             }
 
-            BT_WARN("recv pb-adv mac %02X:%02X:%02X:%02X:%02X:%02X i %d", uuid[9], uuid[8], uuid[7], uuid[6], uuid[5], uuid[4], i);
-
             s_provisioner_ctx[i].status = PROVISION_STATUS_PROVISIONING;
             memcpy(s_provisioner_ctx[i].peer_uuid_mac, uuid + 4, 6);
+
+            scanning_device.peer_addr = s_provisioner_ctx[i].peer_addr;
+            memcpy(scanning_device.peer_uuid_mac, addr->a.val, 6);
+
+            BT_WARN("scanning_device mac %02X:%02X:%02X:%02X:%02X:%02X",
+                    scanning_device.peer_uuid_mac[5],
+                    scanning_device.peer_uuid_mac[4],
+                    scanning_device.peer_uuid_mac[3],
+                    scanning_device.peer_uuid_mac[2],
+                    scanning_device.peer_uuid_mac[1],
+                    scanning_device.peer_uuid_mac[0]);
 
             ret = bt_mesh_provision_adv(uuid, s_netkey_idx, s_provisioner_ctx[i].peer_addr, 0);
 
@@ -686,7 +746,7 @@ static int32_t do_add_appkey_cb(void *arg)
 
     if (my_cfg_mod_app_bind_vnd(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
                                 s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-                                RD_VND_MODEL_SERVER, RD_VENDOR_ID) != 0)
+                                RD_VND_MODEL_CLIENT, RD_VENDOR_ID) != 0)
     {
         return -1;
     }
@@ -699,6 +759,9 @@ static int32_t do_add_appkey_cb(void *arg)
             s_provisioner_ctx[i].peer_uuid_mac[1],
             s_provisioner_ctx[i].peer_uuid_mac[0],
             s_provisioner_ctx[i].peer_addr, s_provisioner_ctx[i].peer_addr);
+
+    set_gw_addr(s_provisioner_ctx[i].peer_addr);
+
     return 0;
 }
 
