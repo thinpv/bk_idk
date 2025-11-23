@@ -316,6 +316,15 @@ static int gen_onoff_status(struct bt_mesh_model *model,
     return 0;
 }
 
+static int gen_sensor_status(struct bt_mesh_model *model,
+                            struct bt_mesh_msg_ctx *ctx,
+                            struct net_buf_simple *buf)
+{
+    BT_ERR("gen_sensor_status");
+
+    return 0;
+}
+
 static int vnd_cli_status_e0(struct bt_mesh_model *model,
                              struct bt_mesh_msg_ctx *ctx,
                              struct net_buf_simple *buf)
@@ -402,6 +411,11 @@ static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
     BT_MESH_MODEL_OP_END,
 };
 
+static const struct bt_mesh_model_op gen_sensor_cli_op[] = {
+    {BT_MESH_MODEL_OP_1(0x52), BT_MESH_LEN_MIN(1), gen_sensor_status},
+    BT_MESH_MODEL_OP_END,
+};
+
 static const struct bt_mesh_model_op vnd_cli_op[] = {
     {RD_VND_MODEL_OP_STATUS_E0, BT_MESH_LEN_MIN(2), vnd_cli_status_e0},
     {RD_VND_MODEL_OP_STATUS_E2, BT_MESH_LEN_MIN(2), vnd_cli_status_e2},
@@ -418,6 +432,7 @@ struct bt_mesh_model models[] = {
     BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
     // BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, NULL, NULL),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_SENSOR_CLI, gen_sensor_cli_op, NULL, NULL),
 };
 
 struct bt_mesh_model vnd_models[] = {
@@ -533,8 +548,15 @@ static void user_unprovisioned_beacon(uint8_t uuid[16],
             return;
         }
 
+        if(addr == NULL)
+        {
+            return;
+        }
+
         // if (0 == memcmp(uuid, provisionee_uuid, 4))
-        if (uuid[14] == 0x28 && uuid[15] == 0x04) // RAL
+        // if (uuid[14] == 0x28 && uuid[15] == 0x04) // RAL
+        // if (uuid[14] == 0xa9 && uuid[15] == 0xc0) // RAL
+        if (uuid[14] == 0xa2 && uuid[15] == 0xbe) // RAL
         {
             uint32_t i = 0;
 
@@ -703,6 +725,7 @@ static int32_t do_add_appkey_cb(void *arg)
 
     models[2].keys[0] = s_appkey_idx;
     models[3].keys[0] = s_appkey_idx;
+    models[4].keys[0] = s_appkey_idx;
 
     vnd_models[0].keys[0] = s_appkey_idx;
     // vnd_models[1].keys[0] = s_appkey_idx;
@@ -740,6 +763,13 @@ static int32_t do_add_appkey_cb(void *arg)
     if (my_cfg_mod_app_bind(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
                             s_provisioner_ctx[i].peer_addr, s_appkey_idx,
                             BT_MESH_MODEL_ID_GEN_ONOFF_SRV) != 0)
+    {
+        return -1;
+    }
+
+    if (my_cfg_mod_app_bind(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
+                            s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+                            BT_MESH_MODEL_ID_SENSOR_SRV) != 0)
     {
         return -1;
     }
