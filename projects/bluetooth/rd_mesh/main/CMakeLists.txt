@@ -6,6 +6,16 @@ set(srcs
     mesh/mesh_demo_cli.c
     mesh/ble_mesh_provision.c
     mesh/ble_mesh_vendor.c
+    mesh/ble_mesh_op_gen_battery_cli.c
+    mesh/ble_mesh_op_gen_onoff_cli.c
+    mesh/ble_mesh_op_light_ctl_cli.c
+    mesh/ble_mesh_op_light_hsl_cli.c
+    mesh/ble_mesh_op_light_lightness_cli.c
+    mesh/ble_mesh_op_scene_cli.c
+    mesh/ble_mesh_op_scheduler_cli.c
+    mesh/ble_mesh_op_sensor_cli.c
+    mesh/ble_mesh_op_time_cli.c
+    mesh/ble_mesh_op_vnd.c
     )
 
 if (CONFIG_OVERRIDE_FLASH_PARTITION)

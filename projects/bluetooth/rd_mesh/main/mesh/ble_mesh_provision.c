@@ -21,6 +21,9 @@
 #include "ble_mesh_vendor.h"
 #include "BleMeshDefine.h"
 
+#include "ble_mesh_defs.h"
+#include "ble_mesh_device.h"
+
 #define UINT8_TO_STREAM(p, u8)  \
     do                          \
     {                           \
@@ -56,11 +59,6 @@
         p += size;                        \
     } while (0)
 
-#define OP_ONOFF_GET BT_MESH_MODEL_OP_2(0x82, 0x01)
-#define OP_ONOFF_SET BT_MESH_MODEL_OP_2(0x82, 0x02)
-#define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
-#define OP_ONOFF_STATUS BT_MESH_MODEL_OP_2(0x82, 0x04)
-
 #define ceiling_fraction(numerator, divider) (((numerator) + ((divider) - 1)) / (divider))
 
 extern ble_err_t bk_bluetooth_get_address(uint8_t *mac);
@@ -78,27 +76,13 @@ struct provision_ctx_struct
     .local_addr = BT_MESH_ADDR_UNASSIGNED,
 };
 
-struct provisioner_ctx_struct2
-{
-    uint8_t status;
-    uint16_t peer_addr;
-    uint32_t recv_count;
-
-    uint8_t peer_uuid_mac[6];
-} scanning_device = {
+struct provisioner_ctx_struct scanning_device = {
     .status = PROVISION_STATUS_IDLE,
     .peer_addr = 0,
     .recv_count = 0,
 };
 
-struct provisioner_ctx_struct
-{
-    uint8_t status;
-    uint16_t peer_addr;
-    uint32_t recv_count;
-
-    uint8_t peer_uuid_mac[6];
-} s_provisioner_ctx[20] = {
+struct provisioner_ctx_struct s_provisioner_ctx[20] = {
     {PROVISION_STATUS_IDLE, 2, 0},
     {PROVISION_STATUS_IDLE, 3, 0},
     {PROVISION_STATUS_IDLE, 4, 0},
@@ -120,8 +104,6 @@ struct provisioner_ctx_struct
     {PROVISION_STATUS_IDLE, 20, 0},
     {PROVISION_STATUS_IDLE, 21, 0},
 };
-
-static uint32_t client_send_count = 0;
 
 // static uint16_t s_app_idx = 0;
 static uint16_t s_appkey_idx = 0;
@@ -180,239 +162,92 @@ static struct bt_mesh_health_srv health_srv = {
 
 BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 
-static const char *const onoff_str[] = {"off", "on"};
-
-static struct
-{
-    bool val;
-    uint32_t count_value;
-    uint8_t tid;
-    uint16_t src;
-    uint32_t transition_time;
-    struct k_work_delayable work;
-} onoff;
-
-/* OnOff messages' transition time and remaining time fields are encoded as an
- * 8 bit value with a 6 bit step field and a 2 bit resolution field.
- * The resolution field maps to:
- * 0: 100 ms
- * 1: 1 s
- * 2: 10 s
- * 3: 20 min
- */
-static const uint32_t time_res[] = {
-    100,
-    MSEC_PER_SEC,
-    10 * MSEC_PER_SEC,
-    10 * 60 * MSEC_PER_SEC,
-};
-
-static inline int32_t model_time_decode(uint8_t val)
-{
-    uint8_t resolution = (val >> 6) & BIT_MASK(2);
-    uint8_t steps = val & BIT_MASK(6);
-
-    if (steps == 0x3f)
-    {
-        return SYS_FOREVER_MS;
-    }
-
-    return steps * time_res[resolution];
-}
-
-static inline uint8_t model_time_encode(int32_t ms)
-{
-    if (ms == SYS_FOREVER_MS)
-    {
-        return 0x3f;
-    }
-
-    for (int i = 0; i < ARRAY_SIZE(time_res); i++)
-    {
-        if (ms >= BIT_MASK(6) * time_res[i])
-        {
-            continue;
-        }
-
-        uint8_t steps = ceiling_fraction(ms, time_res[i]);
-
-        return steps | (i << 6);
-    }
-
-    return 0x3f;
-}
-
-static int onoff_status_send(struct bt_mesh_model *model,
-                             struct bt_mesh_msg_ctx *ctx)
-{
-    uint32_t remaining;
-
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_STATUS, 3);
-    bt_mesh_model_msg_init(&buf, OP_ONOFF_STATUS);
-
-    remaining = k_ticks_to_ms_floor32(
-                    k_work_delayable_remaining_get(&onoff.work)) +
-                onoff.transition_time;
-
-    /* Check using remaining time instead of "work pending" to make the
-     * onoff status send the right value on instant transitions. As the
-     * work item is executed in a lower priority than the mesh message
-     * handler, the work will be pending even on instant transitions.
-     */
-    if (remaining)
-    {
-        net_buf_simple_add_u8(&buf, !onoff.val);
-        net_buf_simple_add_u8(&buf, onoff.val);
-        net_buf_simple_add_u8(&buf, model_time_encode(remaining));
-    }
-    else
-    {
-        net_buf_simple_add_u8(&buf, onoff.val);
-    }
-
-    return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
-}
-
-static void onoff_timeout(struct k_work *work)
-{
-    if (onoff.transition_time)
-    {
-        /* Start transition.
-         *
-         * The LED should be on as long as the transition is in
-         * progress, regardless of the target value, according to the
-         * Bluetooth Mesh Model specification, section 3.1.1.
-         */
-        board_led_set(true);
-
-        k_work_reschedule(&onoff.work, K_MSEC(onoff.transition_time));
-        onoff.transition_time = 0;
-        return;
-    }
-
-    board_led_set(onoff.val);
-}
-
-/* Generic OnOff Client */
-
-static int gen_onoff_status(struct bt_mesh_model *model,
+extern int gen_onoff_status(struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
-                            struct net_buf_simple *buf)
-{
-    uint8_t present = net_buf_simple_pull_u8(buf);
+                            struct net_buf_simple *buf);
 
-    if (buf->len)
-    {
-        uint8_t target = net_buf_simple_pull_u8(buf);
-        int32_t remaining_time =
-            model_time_decode(net_buf_simple_pull_u8(buf));
+extern int gen_battery_status(struct bt_mesh_model *model,
+                              struct bt_mesh_msg_ctx *ctx,
+                              struct net_buf_simple *buf);
 
-        BT_ERR("OnOff status: %s -> %s: (%d ms)\n", onoff_str[present], onoff_str[target], remaining_time);
-        return 0;
-    }
+extern int sensor_status(struct bt_mesh_model *model,
+                         struct bt_mesh_msg_ctx *ctx,
+                         struct net_buf_simple *buf);
 
-    BT_ERR("OnOff status: %s\n", onoff_str[present]);
+extern int time_status(struct bt_mesh_model *model,
+                       struct bt_mesh_msg_ctx *ctx,
+                       struct net_buf_simple *buf);
 
-    return 0;
-}
+extern int scene_status(struct bt_mesh_model *model,
+                        struct bt_mesh_msg_ctx *ctx,
+                        struct net_buf_simple *buf);
 
-static int gen_sensor_status(struct bt_mesh_model *model,
+extern int scheduler_status(struct bt_mesh_model *model,
+                            struct bt_mesh_msg_ctx *ctx,
+                            struct net_buf_simple *buf);
+
+extern int light_lightness_status(struct bt_mesh_model *model,
+                                  struct bt_mesh_msg_ctx *ctx,
+                                  struct net_buf_simple *buf);
+
+extern int light_ctl_status(struct bt_mesh_model *model,
+                            struct bt_mesh_msg_ctx *ctx,
+                            struct net_buf_simple *buf);
+
+extern int light_hsl_status(struct bt_mesh_model *model,
+                            struct bt_mesh_msg_ctx *ctx,
+                            struct net_buf_simple *buf);
+
+extern int vnd_cli_status_e0(struct bt_mesh_model *model,
                              struct bt_mesh_msg_ctx *ctx,
-                             struct net_buf_simple *buf)
-{
-    BT_ERR("gen_sensor_status");
+                             struct net_buf_simple *buf);
 
-    return 0;
-}
-
-static int vnd_cli_status_e0(struct bt_mesh_model *model,
+extern int vnd_cli_status_e2(struct bt_mesh_model *model,
                              struct bt_mesh_msg_ctx *ctx,
-                             struct net_buf_simple *buf)
-{
-    BT_ERR("vnd_cli_status_e0 addr 0x%04X", ctx->addr);
-    uint16_t header = net_buf_simple_pull_le16(buf);
-    BT_ERR("vnd_cli_status_e0 header 0x%04X", header);
-    if (header == RD_HEADER_PROVISION_SET_GW_ADDR)
-    {
-        BT_WARN("Received set_gw_addr response from 0x%04X", ctx->addr);
-        BT_WARN("scanning_device mac %02X:%02X:%02X:%02X:%02X:%02X",
-                scanning_device.peer_uuid_mac[5],
-                scanning_device.peer_uuid_mac[4],
-                scanning_device.peer_uuid_mac[3],
-                scanning_device.peer_uuid_mac[2],
-                scanning_device.peer_uuid_mac[1],
-                scanning_device.peer_uuid_mac[0]);
-        get_device_type(ctx->addr, scanning_device.peer_uuid_mac);
-    }
-    else if (header == RD_HEADER_PROVISION_GET_DEV_TYPE)
-    {
-        uint32_t deviceType;
-        uint8_t magic;
-        uint16_t version;
-
-        deviceType = net_buf_simple_pull_be24(buf);
-        magic = net_buf_simple_pull_u8(buf);
-        version = net_buf_simple_pull_le16(buf);
-        BT_WARN("Device Type: %08X, Magic: %02X, Version: %d", deviceType, magic, version);
-    }
-
-    return 0;
-}
-
-static int vnd_cli_status_e2(struct bt_mesh_model *model,
-                             struct bt_mesh_msg_ctx *ctx,
-                             struct net_buf_simple *buf)
-{
-    BT_ERR("vnd_cli_status_e2");
-    uint32_t peer_our_send_count = net_buf_simple_pull_le32(buf);
-    uint32_t peer_recv_count = net_buf_simple_pull_le32(buf);
-
-    (void)(peer_our_send_count);
-    for (uint32_t i = 0; i < sizeof(s_provisioner_ctx) / sizeof(s_provisioner_ctx[0]); ++i)
-    {
-        if (s_provisioner_ctx[i].peer_addr == ctx->addr)
-        {
-
-            //            BT_WARN("remote add:%02X:%02X:%02X:%02X:%02X:%02X, mesh addr %d",
-            //                    s_provisioner_ctx[i].peer_uuid_mac[5],
-            //                    s_provisioner_ctx[i].peer_uuid_mac[4],
-            //                    s_provisioner_ctx[i].peer_uuid_mac[3],
-            //                    s_provisioner_ctx[i].peer_uuid_mac[2],
-            //                    s_provisioner_ctx[i].peer_uuid_mac[1],
-            //                    s_provisioner_ctx[i].peer_uuid_mac[0],
-            //                    ctx->addr
-            //                   );
-            //
-            //            BT_WARN("our send count %d, peer send our count %d, peer recv count %d",
-            //                    client_send_count, peer_our_send_count, peer_recv_count);
-
-            s_provisioner_ctx[i].recv_count++;
-
-            BT_ERR("ble:W(%d):remote %02X:%02X:%02X:%02X:%02X:%02X mesh %d, we send %d, we recv %d, peer recv %d\n",
-                   rtos_get_time(),
-                   s_provisioner_ctx[i].peer_uuid_mac[5],
-                   s_provisioner_ctx[i].peer_uuid_mac[4],
-                   s_provisioner_ctx[i].peer_uuid_mac[3],
-                   s_provisioner_ctx[i].peer_uuid_mac[2],
-                   s_provisioner_ctx[i].peer_uuid_mac[1],
-                   s_provisioner_ctx[i].peer_uuid_mac[0],
-                   ctx->addr,
-                   client_send_count, s_provisioner_ctx[i].recv_count, peer_recv_count);
-
-            break;
-        }
-    }
-
-    return 0;
-}
+                             struct net_buf_simple *buf);
 
 static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
-    {OP_ONOFF_STATUS, BT_MESH_LEN_MIN(1), gen_onoff_status},
+    {BLE_MESH_MODEL_OP_GEN_ONOFF_STATUS, BT_MESH_LEN_MIN(1), gen_onoff_status},
     BT_MESH_MODEL_OP_END,
 };
 
-static const struct bt_mesh_model_op gen_sensor_cli_op[] = {
-    {BT_MESH_MODEL_OP_1(0x52), BT_MESH_LEN_MIN(1), gen_sensor_status},
+static const struct bt_mesh_model_op gen_battery_cli_op[] = {
+    {BLE_MESH_MODEL_OP_GEN_BATTERY_STATUS, BT_MESH_LEN_MIN(1), gen_battery_status},
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_model_op sensor_cli_op[] = {
+    {BLE_MESH_MODEL_OP_SENSOR_STATUS, BT_MESH_LEN_MIN(1), sensor_status},
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_model_op time_cli_op[] = {
+    {BLE_MESH_MODEL_OP_TIME_STATUS, BT_MESH_LEN_MIN(1), time_status},
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_model_op scene_cli_op[] = {
+    {BLE_MESH_MODEL_OP_SCENE_STATUS, BT_MESH_LEN_MIN(1), scene_status},
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_model_op scheduler_cli_op[] = {
+    {BLE_MESH_MODEL_OP_SCHEDULER_STATUS, BT_MESH_LEN_MIN(1), scheduler_status},
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_model_op light_lightness_cli_op[] = {
+    {BLE_MESH_MODEL_OP_LIGHT_LIGHTNESS_STATUS, BT_MESH_LEN_MIN(1), light_lightness_status},
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_model_op light_ctl_cli_op[] = {
+    {BLE_MESH_MODEL_OP_LIGHT_CTL_STATUS, BT_MESH_LEN_MIN(1), light_ctl_status},
+    BT_MESH_MODEL_OP_END,
+};
+
+static const struct bt_mesh_model_op light_hsl_cli_op[] = {
+    {BLE_MESH_MODEL_OP_LIGHT_HSL_STATUS, BT_MESH_LEN_MIN(1), light_hsl_status},
     BT_MESH_MODEL_OP_END,
 };
 
@@ -432,14 +267,14 @@ struct bt_mesh_model models[] = {
     BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
     // BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, NULL, NULL),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_BATTERY_CLI, NULL, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_SENSOR_CLI, gen_sensor_cli_op, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_TIME_CLI, NULL, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_SCENE_CLI, NULL, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_SCHEDULER_CLI, NULL, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_CLI, NULL, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_CTL_CLI, NULL, NULL, NULL),
-    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_HSL_CLI, NULL, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_BATTERY_CLI, gen_battery_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_SENSOR_CLI, sensor_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_TIME_CLI, time_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_SCENE_CLI, scene_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_SCHEDULER_CLI, scheduler_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_CLI, light_lightness_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_CTL_CLI, light_ctl_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_HSL_CLI, light_hsl_cli_op, NULL, NULL),
 };
 
 struct bt_mesh_model vnd_models[] = {
@@ -537,7 +372,7 @@ static void user_prov_reset(void)
 {
     BT_WARN("The local node has been reset and needs reprovisioning");
     //    bt_mesh_prov_enable(BT_MESH_PROV_ADV);// | BT_MESH_PROV_GATT);
-    onoff.count_value = 0;
+    // onoff.count_value = 0;
     memset(&s_provision_ctx, 0, sizeof(s_provision_ctx));
 }
 
@@ -561,8 +396,7 @@ static void user_unprovisioned_beacon(uint8_t uuid[16],
         }
 
         // if (0 == memcmp(uuid, provisionee_uuid, 4))
-        if (uuid[0] == 0x17 && uuid[14] == 0x28 && uuid[15] == 0x04) // RAL
-        // if (uuid[14] == 0xa9 && uuid[15] == 0xc0) // RAL
+        // if (uuid[0] == 0x17 && uuid[14] == 0x28 && uuid[15] == 0x04) // RAL
         // if (uuid[14] == 0xa2 && uuid[15] == 0xbe) // RAL
         {
             uint32_t i = 0;
@@ -923,64 +757,38 @@ static const struct bt_mesh_prov prov = {
     .link_close = user_link_close,
 };
 
-/** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
-static int gen_onoff_send(bool val)
-{
-    struct bt_mesh_msg_ctx ctx = {
-        .app_idx = models[3].keys[0], /* Use the bound key */
-        .addr = BT_MESH_ADDR_ALL_NODES,
-        .send_ttl = BT_MESH_TTL_DEFAULT,
-    };
-    static uint8_t tid;
+// static void setup_cdb(uint16_t netidx, uint16_t appidx)
+// {
+//     struct bt_mesh_cdb_app_key *key;
 
-    if (ctx.app_idx == BT_MESH_KEY_UNUSED)
-    {
-        BT_ERR("The Generic OnOff Client must be bound to a key before sending.");
-        return -ENOENT;
-    }
+//     key = bt_mesh_cdb_app_key_alloc(netidx, appidx);
 
-    BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET, 2);
-    bt_mesh_model_msg_init(&buf, OP_ONOFF_SET);
-    net_buf_simple_add_u8(&buf, val);
-    net_buf_simple_add_u8(&buf, tid++);
+//     if (key == NULL)
+//     {
+//         BT_ERR("Failed to allocate app-key 0x%04x\n", appidx);
+//         return;
+//     }
 
-    BT_ERR("Sending OnOff Set: %s", onoff_str[val]);
+//     bt_rand(key->keys[0].app_key, 16);
 
-    return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
-}
+//     if (IS_ENABLED(CONFIG_BT_SETTINGS))
+//     {
+//         bt_mesh_cdb_app_key_store(key);
+//     }
+// }
 
-static void setup_cdb(uint16_t netidx, uint16_t appidx)
-{
-    struct bt_mesh_cdb_app_key *key;
+// static void button_pressed(struct k_work *work)
+// {
+//     (void)setup_cdb;
 
-    key = bt_mesh_cdb_app_key_alloc(netidx, appidx);
+//     if (bt_mesh_is_provisioned())
+//     {
+//         (void)gen_onoff_send(!onoff.val);
+//         return;
+//     }
 
-    if (key == NULL)
-    {
-        BT_ERR("Failed to allocate app-key 0x%04x\n", appidx);
-        return;
-    }
-
-    bt_rand(key->keys[0].app_key, 16);
-
-    if (IS_ENABLED(CONFIG_BT_SETTINGS))
-    {
-        bt_mesh_cdb_app_key_store(key);
-    }
-}
-
-static void button_pressed(struct k_work *work)
-{
-    (void)setup_cdb;
-
-    if (bt_mesh_is_provisioned())
-    {
-        (void)gen_onoff_send(!onoff.val);
-        return;
-    }
-
-    //    self_provision();
-}
+//     //    self_provision();
+// }
 
 static void ble_mesh_provision_ready(int err)
 {
@@ -1057,7 +865,7 @@ int bt_mesh_provision_init(void)
 
     (void)index;
 
-    k_work_init(&button_work, button_pressed);
+    // k_work_init(&button_work, button_pressed);
 
     if (err)
     {
@@ -1065,7 +873,7 @@ int bt_mesh_provision_init(void)
         return err;
     }
 
-    k_work_init_delayable(&onoff.work, onoff_timeout);
+    // k_work_init_delayable(&onoff.work, onoff_timeout);
 
     /* Initialize the Bluetooth Subsystem */
     err = bt_enable(ble_mesh_provision_ready);
