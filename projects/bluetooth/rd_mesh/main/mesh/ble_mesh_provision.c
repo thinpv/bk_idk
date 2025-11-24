@@ -317,8 +317,8 @@ static int gen_onoff_status(struct bt_mesh_model *model,
 }
 
 static int gen_sensor_status(struct bt_mesh_model *model,
-                            struct bt_mesh_msg_ctx *ctx,
-                            struct net_buf_simple *buf)
+                             struct bt_mesh_msg_ctx *ctx,
+                             struct net_buf_simple *buf)
 {
     BT_ERR("gen_sensor_status");
 
@@ -336,12 +336,12 @@ static int vnd_cli_status_e0(struct bt_mesh_model *model,
     {
         BT_WARN("Received set_gw_addr response from 0x%04X", ctx->addr);
         BT_WARN("scanning_device mac %02X:%02X:%02X:%02X:%02X:%02X",
-                    scanning_device.peer_uuid_mac[5],
-                    scanning_device.peer_uuid_mac[4],
-                    scanning_device.peer_uuid_mac[3],
-                    scanning_device.peer_uuid_mac[2],
-                    scanning_device.peer_uuid_mac[1],
-                    scanning_device.peer_uuid_mac[0]);
+                scanning_device.peer_uuid_mac[5],
+                scanning_device.peer_uuid_mac[4],
+                scanning_device.peer_uuid_mac[3],
+                scanning_device.peer_uuid_mac[2],
+                scanning_device.peer_uuid_mac[1],
+                scanning_device.peer_uuid_mac[0]);
         get_device_type(ctx->addr, scanning_device.peer_uuid_mac);
     }
     else if (header == RD_HEADER_PROVISION_GET_DEV_TYPE)
@@ -432,7 +432,14 @@ struct bt_mesh_model models[] = {
     BT_MESH_MODEL_HEALTH_SRV(&health_srv, &health_pub),
     // BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_SRV, gen_onoff_srv_op, NULL, NULL),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_ONOFF_CLI, gen_onoff_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_GEN_BATTERY_CLI, NULL, NULL, NULL),
     BT_MESH_MODEL(BT_MESH_MODEL_ID_SENSOR_CLI, gen_sensor_cli_op, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_TIME_CLI, NULL, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_SCENE_CLI, NULL, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_SCHEDULER_CLI, NULL, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_LIGHTNESS_CLI, NULL, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_CTL_CLI, NULL, NULL, NULL),
+    BT_MESH_MODEL(BT_MESH_MODEL_ID_LIGHT_HSL_CLI, NULL, NULL, NULL),
 };
 
 struct bt_mesh_model vnd_models[] = {
@@ -548,15 +555,15 @@ static void user_unprovisioned_beacon(uint8_t uuid[16],
             return;
         }
 
-        if(addr == NULL)
+        if (addr == NULL)
         {
             return;
         }
 
         // if (0 == memcmp(uuid, provisionee_uuid, 4))
-        // if (uuid[14] == 0x28 && uuid[15] == 0x04) // RAL
+        if (uuid[0] == 0x17 && uuid[14] == 0x28 && uuid[15] == 0x04) // RAL
         // if (uuid[14] == 0xa9 && uuid[15] == 0xc0) // RAL
-        if (uuid[14] == 0xa2 && uuid[15] == 0xbe) // RAL
+        // if (uuid[14] == 0xa2 && uuid[15] == 0xbe) // RAL
         {
             uint32_t i = 0;
 
@@ -659,57 +666,161 @@ static void user_prov_node_added(uint16_t netkey_idx, uint8_t uuid[16], uint16_t
     //    }
 }
 
-static int my_cfg_mod_app_bind(int i, uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
+static int my_cfg_mod_app_bind(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
                                uint16_t mod_app_idx, uint16_t mod_id)
 {
+    BT_ERR("my_cfg_mod_app_bind to 0x%04X mod_id: 0x%04X", addr, mod_id);
     int err = 0;
     uint8_t status = 0;
-    err = bt_mesh_cfg_mod_app_bind(s_netkey_idx, s_provisioner_ctx[i].peer_addr,
-                                   s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+    err = bt_mesh_cfg_mod_app_bind(net_idx, addr, elem_addr, mod_app_idx,
                                    mod_id, &status);
 
     if (err)
     {
-        BT_ERR("Unable to send Model App Bind (err %d)", err);
-        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
-        reset_device_ctx(i);
+        BT_ERR("Unable to send Model App Bind (err %d) mod_id: 0x%04X", err, mod_id);
+        deprovision_device_inter(addr);
+        // reset_device_ctx(i);
         return -1;
     }
 
     if (status)
     {
-        BT_ERR("Model App Bind failed with status 0x%02x", status);
-        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
-        reset_device_ctx(i);
+        BT_ERR("Model App Bind failed with status 0x%02x mod_id: 0x%04X", status, mod_id);
+        deprovision_device_inter(addr);
+        // reset_device_ctx(i);
         return -1;
     }
 
     return 0;
 }
 
-static int my_cfg_mod_app_bind_vnd(int i, uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
+static int my_cfg_mod_app_bind_vnd(uint16_t net_idx, uint16_t addr, uint16_t elem_addr,
                                    uint16_t mod_app_idx, uint16_t mod_id, uint16_t cid)
 {
+    BT_ERR("my_cfg_mod_app_bind_vnd to 0x%04X mod_id: 0x%04X, cid: 0x%04X", addr, mod_id, cid);
     int err = 0;
     uint8_t status = 0;
-    err = bt_mesh_cfg_mod_app_bind_vnd(s_netkey_idx, s_provisioner_ctx[i].peer_addr,
-                                       s_provisioner_ctx[i].peer_addr, s_appkey_idx,
+    err = bt_mesh_cfg_mod_app_bind_vnd(net_idx, addr, elem_addr, mod_app_idx,
                                        mod_id, cid, &status);
 
     if (err)
     {
-        BT_ERR("Unable to send Model App Bind (err %d)", err);
-        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
-        reset_device_ctx(i);
+        BT_ERR("Unable to send Model App Bind (err %d) mod_id: 0x%04X", err, mod_id);
+        deprovision_device_inter(addr);
+        // reset_device_ctx(i);
         return -1;
     }
 
     if (status)
     {
-        BT_ERR("Model App Bind failed with status 0x%02x", status);
-        deprovision_device_inter(s_provisioner_ctx[i].peer_addr);
-        reset_device_ctx(i);
+        BT_ERR("Model App Bind failed with status 0x%02x mod_id: 0x%04X", status, mod_id);
+        deprovision_device_inter(addr);
+        // reset_device_ctx(i);
         return -1;
+    }
+
+    return 0;
+}
+
+static int get_composition_data(uint16_t addr)
+{
+    BT_ERR("get_composition_data to 0x%04X", addr);
+    NET_BUF_SIMPLE_DEFINE(buf, BT_MESH_RX_SDU_MAX);
+    struct bt_mesh_comp_p0_elem elem;
+    struct bt_mesh_comp_p0 comp;
+    uint8_t page = 0x00;
+    int err;
+
+    err = bt_mesh_cfg_comp_data_get(s_net_idx, addr, page, &page,
+                                    &buf);
+    if (err)
+    {
+        BT_ERR("Getting composition failed (err %d)", err);
+        return 0;
+    }
+
+    if (page != 0x00)
+    {
+        BT_WARN("Got page 0x%02x. No parser available.",
+                page);
+        return 0;
+    }
+
+    err = bt_mesh_comp_p0_get(&comp, &buf);
+    if (err)
+    {
+        BT_ERR("Couldn't parse Composition data (err %d)",
+               err);
+        return 0;
+    }
+
+    BT_WARN("Got Composition Data for 0x%04x:", addr);
+    BT_WARN("\tCID      0x%04x", comp.cid);
+    BT_WARN("\tPID      0x%04x", comp.pid);
+    BT_WARN("\tVID      0x%04x", comp.vid);
+    BT_WARN("\tCRPL     0x%04x", comp.crpl);
+    BT_WARN("\tFeatures 0x%04x", comp.feat);
+
+    int elem_idx = 0;
+    while (bt_mesh_comp_p0_elem_pull(&comp, &elem))
+    {
+        int i;
+
+        BT_WARN("\tElement @ %d - %d:", elem.loc, elem_idx);
+
+        if (elem.nsig)
+        {
+            BT_WARN("\t\tSIG Models:");
+        }
+        else
+        {
+            BT_WARN("\t\tNo SIG Models");
+        }
+
+        for (i = 0; i < elem.nsig; i++)
+        {
+            uint16_t mod_id = bt_mesh_comp_p0_elem_mod(&elem, i);
+
+            BT_WARN("\t\t\t0x%04x", mod_id);
+            if (mod_id >= BT_MESH_MODEL_ID_GEN_ONOFF_SRV &&
+                my_cfg_mod_app_bind(s_net_idx, addr,
+                                    addr + elem_idx, s_appkey_idx,
+                                    mod_id) != 0)
+            {
+                return -1;
+            }
+        }
+
+        if (elem.nvnd)
+        {
+            BT_WARN("\t\tVendor Models:");
+        }
+        else
+        {
+            BT_WARN("\t\tNo Vendor Models");
+        }
+
+        for (i = 0; i < elem.nvnd; i++)
+        {
+            struct bt_mesh_mod_id_vnd mod =
+                bt_mesh_comp_p0_elem_mod_vnd(&elem, i);
+
+            BT_WARN("\t\t\tCompany 0x%04x: 0x%04x",
+                    mod.company, mod.id);
+
+            if (my_cfg_mod_app_bind_vnd(s_net_idx, addr,
+                                        addr + elem_idx, s_appkey_idx,
+                                        mod.id, mod.company) != 0)
+            {
+                return -1;
+            }
+        }
+        elem_idx++;
+    }
+
+    if (buf.len)
+    {
+        BT_WARN("\t\t...truncated data!");
     }
 
     return 0;
@@ -723,9 +834,10 @@ static int32_t do_add_appkey_cb(void *arg)
 
     s_provisioner_ctx[i].status = PROVISION_STATUS_PROVISION_COMPL;
 
-    models[2].keys[0] = s_appkey_idx;
-    models[3].keys[0] = s_appkey_idx;
-    models[4].keys[0] = s_appkey_idx;
+    for (int i = 2; i < 12; i++)
+    {
+        models[i].keys[0] = s_appkey_idx;
+    }
 
     vnd_models[0].keys[0] = s_appkey_idx;
     // vnd_models[1].keys[0] = s_appkey_idx;
@@ -760,26 +872,7 @@ static int32_t do_add_appkey_cb(void *arg)
         return -1;
     }
 
-    if (my_cfg_mod_app_bind(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
-                            s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-                            BT_MESH_MODEL_ID_GEN_ONOFF_SRV) != 0)
-    {
-        return -1;
-    }
-
-    if (my_cfg_mod_app_bind(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
-                            s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-                            BT_MESH_MODEL_ID_SENSOR_SRV) != 0)
-    {
-        return -1;
-    }
-
-    if (my_cfg_mod_app_bind_vnd(i, s_net_idx, s_provisioner_ctx[i].peer_addr,
-                                s_provisioner_ctx[i].peer_addr, s_appkey_idx,
-                                RD_VND_MODEL_CLIENT, RD_VENDOR_ID) != 0)
-    {
-        return -1;
-    }
+    get_composition_data(s_provisioner_ctx[i].peer_addr);
 
     BT_WARN("bind success, %02X:%02X:%02X:%02X:%02X:%02X addr %d appaddr %d",
             s_provisioner_ctx[i].peer_uuid_mac[5],

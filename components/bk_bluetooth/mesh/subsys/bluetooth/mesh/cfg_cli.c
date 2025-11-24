@@ -976,7 +976,7 @@ int bt_mesh_cfg_comp_data_get(uint16_t net_idx, uint16_t addr, uint8_t page,
 		return err;
 	}
 
-	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, K_MSEC(msg_timeout));
+	return bt_mesh_msg_ack_ctx_wait(&cli->ack_ctx, K_MSEC(5000));
 }
 
 static int get_state_u8(uint16_t net_idx, uint16_t addr, uint32_t op, uint32_t rsp,

@@ -161,8 +161,8 @@
 #define CONFIG_BT_MESH_TX_SEG_MSG_COUNT                     2
 #define CONFIG_BT_MESH_RX_SEG_MSG_COUNT                     2
 #define CONFIG_BT_MESH_TX_SEG_MAX                           3
-#define CONFIG_BT_MESH_RX_SEG_MAX                           3
-#define CONFIG_BT_MESH_SEG_BUFS                             6
+#define CONFIG_BT_MESH_RX_SEG_MAX                           10
+#define CONFIG_BT_MESH_SEG_BUFS                             12
 #define CONFIG_BT_MESH_LABEL_COUNT                          3
 #define CONFIG_BT_MESH_TX_SEG_RETRANS_TIMEOUT_UNICAST       400
 #define CONFIG_BT_MESH_TX_SEG_RETRANS_TIMEOUT_GROUP         10
