@@ -162,47 +162,49 @@ static struct bt_mesh_health_srv health_srv = {
 
 BT_MESH_HEALTH_PUB_DEFINE(health_pub, 0);
 
-extern int gen_onoff_status(struct bt_mesh_model *model,
+int add_new_device(char *mac, uint32_t type, uint16_t addr, uint16_t version);
+
+int gen_onoff_status(struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
                             struct net_buf_simple *buf);
 
-extern int gen_battery_status(struct bt_mesh_model *model,
+int gen_battery_status(struct bt_mesh_model *model,
                               struct bt_mesh_msg_ctx *ctx,
                               struct net_buf_simple *buf);
 
-extern int sensor_status(struct bt_mesh_model *model,
+int sensor_status(struct bt_mesh_model *model,
                          struct bt_mesh_msg_ctx *ctx,
                          struct net_buf_simple *buf);
 
-extern int time_status(struct bt_mesh_model *model,
+int time_status(struct bt_mesh_model *model,
                        struct bt_mesh_msg_ctx *ctx,
                        struct net_buf_simple *buf);
 
-extern int scene_status(struct bt_mesh_model *model,
+int scene_status(struct bt_mesh_model *model,
                         struct bt_mesh_msg_ctx *ctx,
                         struct net_buf_simple *buf);
 
-extern int scheduler_status(struct bt_mesh_model *model,
+int scheduler_status(struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
                             struct net_buf_simple *buf);
 
-extern int light_lightness_status(struct bt_mesh_model *model,
+int light_lightness_status(struct bt_mesh_model *model,
                                   struct bt_mesh_msg_ctx *ctx,
                                   struct net_buf_simple *buf);
 
-extern int light_ctl_status(struct bt_mesh_model *model,
+int light_ctl_status(struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
                             struct net_buf_simple *buf);
 
-extern int light_hsl_status(struct bt_mesh_model *model,
+int light_hsl_status(struct bt_mesh_model *model,
                             struct bt_mesh_msg_ctx *ctx,
                             struct net_buf_simple *buf);
 
-extern int vnd_cli_status_e0(struct bt_mesh_model *model,
+int vnd_cli_status_e0(struct bt_mesh_model *model,
                              struct bt_mesh_msg_ctx *ctx,
                              struct net_buf_simple *buf);
 
-extern int vnd_cli_status_e2(struct bt_mesh_model *model,
+int vnd_cli_status_e2(struct bt_mesh_model *model,
                              struct bt_mesh_msg_ctx *ctx,
                              struct net_buf_simple *buf);
 

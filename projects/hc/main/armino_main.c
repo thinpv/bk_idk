@@ -29,7 +29,12 @@ uint8_t host_init_finish(int32_t reason)
     return 0;
 }
 
-int main_cpp(void *arg);
+void main_cpp_task(void *arg)
+{
+    extern int main_cpp(void);
+    main_cpp();
+    rtos_delete_thread(NULL);
+}
 
 int main(void)
 {
@@ -53,7 +58,7 @@ int main(void)
     rtos_create_thread(&ble_mesh_thread_handle,
                        4,
                        "main_cpp",
-                       (void *)main_cpp,
+                       (void *)main_cpp_task,
                        2 * 1024,
                        (void *)NULL);
 

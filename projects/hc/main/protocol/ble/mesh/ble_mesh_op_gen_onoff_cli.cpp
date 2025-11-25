@@ -35,7 +35,7 @@ static inline int32_t model_time_decode(uint8_t val)
     return steps * time_res[resolution];
 }
 
-int gen_onoff_status(struct bt_mesh_model *model,
+extern "C" int gen_onoff_status(struct bt_mesh_model *model,
                      struct bt_mesh_msg_ctx *ctx,
                      struct net_buf_simple *buf)
 {

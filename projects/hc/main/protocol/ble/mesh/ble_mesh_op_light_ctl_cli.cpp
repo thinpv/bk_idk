@@ -3,7 +3,7 @@
 extern struct bt_mesh_model models[];
 extern struct bt_mesh_model vnd_models[];
 
-int scheduler_status(struct bt_mesh_model *model,
+extern "C" int light_ctl_status(struct bt_mesh_model *model,
                      struct bt_mesh_msg_ctx *ctx,
                      struct net_buf_simple *buf)
 {

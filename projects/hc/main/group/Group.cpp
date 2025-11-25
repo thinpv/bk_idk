@@ -299,7 +299,7 @@ int Group::Do(Json::Value &dataValue, bool ack)
 	{
 		if (dataValue.isMember(KEY_ATTRIBUTE_ONOFF) && dataValue[KEY_ATTRIBUTE_ONOFF].isInt())
 		{
-			// int value = dataValue[KEY_ATTRIBUTE_ONOFF].asInt();
+			int value = dataValue[KEY_ATTRIBUTE_ONOFF].asInt();
 #ifdef CONFIG_ENABLE_BLE
 			if (value == 2)
 			{
@@ -318,16 +318,16 @@ int Group::Do(Json::Value &dataValue, bool ack)
 		}
 		if (dataValue.isMember(KEY_ATTRIBUTE_DIM) && dataValue[KEY_ATTRIBUTE_DIM].isInt())
 		{
-			// int value = dataValue[KEY_ATTRIBUTE_DIM].asInt();
-			// uint16_t dim = (value * 65535) / 100;
+			int value = dataValue[KEY_ATTRIBUTE_DIM].asInt();
+			uint16_t dim = (value * 65535) / 100;
 #ifdef CONFIG_ENABLE_BLE
 			BleProtocol::GetInstance()->SetDimmingLight(addr + BLE_GROUP_OFFSET, dim, TRANSITION_DEFAULT, ack);
 #endif
 		}
 		if (dataValue.isMember(KEY_ATTRIBUTE_CCT) && dataValue[KEY_ATTRIBUTE_CCT].isInt())
 		{
-			// int value = dataValue[KEY_ATTRIBUTE_CCT].asInt();
-			// uint16_t cct = (value * 192) + 800;
+			int value = dataValue[KEY_ATTRIBUTE_CCT].asInt();
+			uint16_t cct = (value * 192) + 800;
 #ifdef CONFIG_ENABLE_BLE
 			BleProtocol::GetInstance()->SetCctLight(addr + BLE_GROUP_OFFSET, cct, TRANSITION_DEFAULT, ack);
 #endif
@@ -336,16 +336,16 @@ int Group::Do(Json::Value &dataValue, bool ack)
 				dataValue.isMember(KEY_ATTRIBUTE_SATURATION) && dataValue[KEY_ATTRIBUTE_SATURATION].isInt() &&
 				dataValue.isMember(KEY_ATTRIBUTE_LUMINANCE) && dataValue[KEY_ATTRIBUTE_LUMINANCE].isInt())
 		{
-			// int h = dataValue[KEY_ATTRIBUTE_HUE].asInt();
-			// int s = dataValue[KEY_ATTRIBUTE_SATURATION].asInt();
-			// int l = dataValue[KEY_ATTRIBUTE_LUMINANCE].asInt();
+			int h = dataValue[KEY_ATTRIBUTE_HUE].asInt();
+			int s = dataValue[KEY_ATTRIBUTE_SATURATION].asInt();
+			int l = dataValue[KEY_ATTRIBUTE_LUMINANCE].asInt();
 #ifdef CONFIG_ENABLE_BLE
 			BleProtocol::GetInstance()->SetHSLLight(addr + BLE_GROUP_OFFSET, h, s, l, TRANSITION_DEFAULT, ack);
 #endif
 		}
 		if (dataValue.isMember(KEY_ATTRIBUTE_MODE_RGB) && dataValue[KEY_ATTRIBUTE_MODE_RGB].isInt())
 		{
-			// int value = dataValue[KEY_ATTRIBUTE_MODE_RGB].asInt();
+			int value = dataValue[KEY_ATTRIBUTE_MODE_RGB].asInt();
 #ifdef CONFIG_ENABLE_BLE
 			BleProtocol::GetInstance()->CallModeRgb(addr + BLE_GROUP_OFFSET, value);
 #endif

@@ -16,6 +16,7 @@ if(CONFIG_BT_MESH)
 	device/ble/module
 	device/ble/device
 	protocol/ble
+    protocol/ble/mesh
 endif()
 	database
 	mqtt
@@ -45,6 +46,8 @@ if(CONFIG_BT_MESH)
 	$(wildcard device/ble/module/*.cpp)
 	$(wildcard device/ble/device/*.cpp)
 	$(wildcard protocol/ble/*.cpp)
+	$(wildcard protocol/ble/mesh/*.c)
+	$(wildcard protocol/ble/mesh/*.cpp)
 endif()
 	$(wildcard database/*.cpp)
 	$(wildcard mqtt/*.cpp)
@@ -56,25 +59,11 @@ endif()
 
 
 set(incs .
-        mesh
         log
     )
 
 set(srcs
     armino_main.c
-    mesh/mesh_demo_cli.c
-    mesh/ble_mesh_provision.c
-    mesh/ble_mesh_vendor.c
-    mesh/ble_mesh_op_gen_battery_cli.c
-    mesh/ble_mesh_op_gen_onoff_cli.c
-    mesh/ble_mesh_op_light_ctl_cli.c
-    mesh/ble_mesh_op_light_hsl_cli.c
-    mesh/ble_mesh_op_light_lightness_cli.c
-    mesh/ble_mesh_op_scene_cli.c
-    mesh/ble_mesh_op_scheduler_cli.c
-    mesh/ble_mesh_op_sensor_cli.c
-    mesh/ble_mesh_op_time_cli.c
-    mesh/ble_mesh_op_vnd.c
     log/Log.c
     )
 

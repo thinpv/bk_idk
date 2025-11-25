@@ -4,7 +4,7 @@ menu "SMH configuration"
 
     config SMH
         bool "Enable SMH"
-        default n
+        default y
 
     config ENABLE_ZIGBEE
         bool "Enable Zigbee feature"
@@ -16,7 +16,7 @@ menu "SMH configuration"
     config ENABLE_BLE
         bool "Enable BLE feature"
         depends on SMH
-        default n
+        default y
         help
             Can connect to BLE devices
 

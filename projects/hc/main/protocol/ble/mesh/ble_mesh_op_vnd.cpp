@@ -5,13 +5,16 @@
 #include "ble_mesh_device.h"
 #include "ble_mesh_vendor.h"
 
+#include "DeviceManager.h"
+#include "Util.h"
+
 extern struct bt_mesh_model models[];
 extern struct bt_mesh_model vnd_models[];
 extern struct provisioner_ctx_struct scanning_device;
 
-int vnd_cli_status_e0(struct bt_mesh_model *model,
-                      struct bt_mesh_msg_ctx *ctx,
-                      struct net_buf_simple *buf)
+extern "C" int vnd_cli_status_e0(struct bt_mesh_model *model,
+                                 struct bt_mesh_msg_ctx *ctx,
+                                 struct net_buf_simple *buf)
 {
     BT_ERR("vnd_cli_status_e0");
     uint16_t header = net_buf_simple_pull_le16(buf);
@@ -30,22 +33,23 @@ int vnd_cli_status_e0(struct bt_mesh_model *model,
     }
     else if (header == RD_HEADER_PROVISION_GET_DEV_TYPE)
     {
-        uint32_t deviceType;
-        uint8_t magic;
-        uint16_t version;
-
-        deviceType = net_buf_simple_pull_be24(buf);
-        magic = net_buf_simple_pull_u8(buf);
-        version = net_buf_simple_pull_le16(buf);
+        uint32_t deviceType = net_buf_simple_pull_be24(buf);
+        uint8_t magic = net_buf_simple_pull_u8(buf);
+        uint16_t version = net_buf_simple_pull_le16(buf);
         BT_WARN("Device Type: %08X, Magic: %02X, Version: %d", deviceType, magic, version);
+
+        Json::Value dataJson;
+        string mac = Util::ConvertU32ToHexString(scanning_device.peer_uuid_mac, sizeof(scanning_device.peer_uuid_mac));
+        BT_WARN("mac: %s", mac.c_str());
+        Device *device = DeviceManager::GetInstance()->AddDevice(mac, deviceType, ctx->addr, version, &dataJson);
     }
 
     return 0;
 }
 
-int vnd_cli_status_e2(struct bt_mesh_model *model,
-                      struct bt_mesh_msg_ctx *ctx,
-                      struct net_buf_simple *buf)
+extern "C" int vnd_cli_status_e2(struct bt_mesh_model *model,
+                                 struct bt_mesh_msg_ctx *ctx,
+                                 struct net_buf_simple *buf)
 {
     BT_ERR("vnd_cli_status_e2");
 

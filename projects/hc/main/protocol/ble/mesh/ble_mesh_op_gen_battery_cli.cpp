@@ -3,9 +3,9 @@
 extern struct bt_mesh_model models[];
 extern struct bt_mesh_model vnd_models[];
 
-int time_status(struct bt_mesh_model *model,
-                struct bt_mesh_msg_ctx *ctx,
-                struct net_buf_simple *buf)
+extern "C" int gen_battery_status(struct bt_mesh_model *model,
+                       struct bt_mesh_msg_ctx *ctx,
+                       struct net_buf_simple *buf)
 {
     char str[128];
     str[0] = 0;
