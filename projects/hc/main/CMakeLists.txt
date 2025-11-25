@@ -10,6 +10,7 @@ set(cpp_incs
 	rule
 	rule/input
 	rule/output
+	protocol/uart
 if(CONFIG_BT_MESH)
 	device/ble
 	device/ble/module
@@ -25,6 +26,7 @@ endif()
     )
 
 file(GLOB cpp_srcs 
+	$(wildcard ./*.cpp)
 	$(wildcard json/*.cpp)
 	$(wildcard object/*.cpp)
 	$(wildcard feature/*.cpp)
@@ -37,6 +39,7 @@ file(GLOB cpp_srcs
 	$(wildcard rule/*.cpp)
 	$(wildcard rule/input/*.cpp)
 	$(wildcard rule/output/*.cpp)
+	$(wildcard protocol/uart/*.cpp)
 if(CONFIG_BT_MESH)
 	$(wildcard device/ble/*.cpp)
 	$(wildcard device/ble/module/*.cpp)

@@ -3,7 +3,7 @@
 #include <string>
 #include <stdint.h>
 #include <vector>
-// #include "Uart.h"
+#include "Uart.h"
 #include <atomic>
 #include <functional>
 #include <mutex>
@@ -219,7 +219,7 @@ typedef struct __attribute__((packed))
 	uint8_t data[];
 } message_rsp_st;
 
-class BleProtocol// : public Uart
+class BleProtocol : public Uart
 {
 private:
 	typedef struct __attribute__((packed))

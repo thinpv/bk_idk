@@ -12,14 +12,12 @@ extern void rtos_set_user_app_entry(beken_thread_function_t entry);
 
 #ifdef CONFIG_CACHE_CUSTOM_SRAM_MAPPING
 const unsigned int g_sram_addr_map[4] =
-{
-    0x38000000,
-    0x30020000,
-    0x38020000,
-    0x30000000
-};
+    {
+        0x38000000,
+        0x30020000,
+        0x38020000,
+        0x30000000};
 #endif
-
 
 void user_app_main(void)
 {
@@ -30,6 +28,8 @@ uint8_t host_init_finish(int32_t reason)
     os_printf("%s reason %d\n", __func__, reason);
     return 0;
 }
+
+int main_cpp(void *arg);
 
 int main(void)
 {
@@ -48,6 +48,14 @@ int main(void)
     zephyr_ble_mesh_init(host_init_finish);
 
     cli_ble_mesh_demo_init();
+
+    void *ble_mesh_thread_handle = NULL;
+    rtos_create_thread(&ble_mesh_thread_handle,
+                       4,
+                       "main_cpp",
+                       (void *)main_cpp,
+                       2 * 1024,
+                       (void *)NULL);
 
     return 0;
 }
