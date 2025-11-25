@@ -4,6 +4,7 @@
 #include "Log.h"
 #include "ErrorCode.h"
 #include <thread>
+#include <algorithm>
 
 TimerSchedule *TimerSchedule::GetInstance()
 {

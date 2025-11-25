@@ -32,7 +32,7 @@ void Uart::init()
 	if (Open(baudrate) < 0)
 	{
 		LOGE("Open uart error");
-		exit(1);
+		_exit(1);
 	}
 }
 
