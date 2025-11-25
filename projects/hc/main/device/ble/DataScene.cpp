@@ -38,7 +38,7 @@ Json::Value DataScene::GetDataDeviceInScene(uint32_t type, int idScene)
                         Json::Value device = category["devices"];
                         if (device.isObject() && device.isMember("type") && device["type"].isInt() && device.isMember("properties") && device["properties"].isObject())
                         {
-                            if (device["type"].asInt() == type)
+                            if ((uint32_t)device["type"].asInt() == type)
                             {
                                 rs = device["properties"];
                                 return rs;

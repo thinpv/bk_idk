@@ -633,7 +633,8 @@ static void user_prov_reset(void)
 
 static void user_unprovisioned_beacon(uint8_t uuid[16],
                                       bt_mesh_prov_oob_info_t oob_info,
-                                      uint32_t *uri_hash)
+                                      uint32_t *uri_hash,
+                                      const bt_addr_le_t *addr)
 {
     if (provision_role == PROVISION_ROLE_PROVISIONER)
     {

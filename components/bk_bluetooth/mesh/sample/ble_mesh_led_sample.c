@@ -483,7 +483,8 @@ static uint8_t dev_uuid[16] = {0xdd, 0xdd, 0};
 
 static void unprovisioned_beacon(uint8_t uuid[16],
                                  bt_mesh_prov_oob_info_t oob_info,
-                                 uint32_t *uri_hash)
+                                 uint32_t *uri_hash,
+                                 const bt_addr_le_t *addr)
 {
     if (provision_type == PROVISION_TYPE_AUTO)
     {

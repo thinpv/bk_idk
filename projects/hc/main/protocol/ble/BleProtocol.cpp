@@ -182,7 +182,7 @@ void BleProtocol::CheckKeyBle()
             tempNetKey.erase(std::remove(tempNetKey.begin(), tempNetKey.end(), '-'), tempNetKey.end());
             if (tempNetKey.size() == 32)
             {
-                for (int i = 0; i < tempNetKey.length(); i += 2)
+                for (size_t i = 0; i < tempNetKey.length(); i += 2)
                 {
                     std::string hexByte = tempNetKey.substr(i, 2);
                     netKey[i / 2] = std::stoi(hexByte, nullptr, 16);
@@ -211,7 +211,7 @@ void BleProtocol::CheckKeyBle()
             tempDeviceKey.erase(std::remove(tempDeviceKey.begin(), tempDeviceKey.end(), '-'), tempDeviceKey.end());
             if (tempDeviceKey.size() == 32)
             {
-                for (int i = 0; i < tempDeviceKey.length(); i += 2)
+                for (size_t i = 0; i < tempDeviceKey.length(); i += 2)
                 {
                     std::string hexByte = tempDeviceKey.substr(i, 2);
                     gwKey[i / 2] = std::stoi(hexByte, nullptr, 16);
@@ -239,7 +239,7 @@ void BleProtocol::CheckKeyBle()
             tempAppKey.erase(std::remove(tempAppKey.begin(), tempAppKey.end(), '-'), tempAppKey.end());
             if (tempAppKey.size() == 32)
             {
-                for (int i = 0; i < tempAppKey.length(); i += 2)
+                for (size_t i = 0; i < tempAppKey.length(); i += 2)
                 {
                     std::string hexByte = tempAppKey.substr(i, 2);
                     appKey[i / 2] = std::stoi(hexByte, nullptr, 16);
@@ -857,7 +857,7 @@ int BleProtocol::AddDevice(scan_device_message_t *scan_device_message)
     // #endif
     uint16_t version = 0;
     uint32_t deviceType = 0;
-    uuid_t *uuid = (uuid_t *)scan_device_message->uuid;
+    // uuid_t *uuid = (uuid_t *)scan_device_message->uuid;
     string mac = Util::ConvertU32ToHexString(scan_device_message->mac, sizeof(scan_device_message->mac));
     LOGI("Scan device mac 0x%s, rssi: %i", mac.c_str(), scan_device_message->rssi);
     int rs = CODE_ERROR;
@@ -4424,7 +4424,7 @@ int BleProtocol::UpdateDeviceKeyDev(uint16_t devAddr, string devKeyDev)
             .header = 0x12,
             .devAddr = devAddr};
         update_devkey_device.element = 0x0002;
-        for (int i = 0; i < devKeyDev.length(); i += 2)
+        for (size_t i = 0; i < devKeyDev.length(); i += 2)
         {
             std::string hexByte = devKeyDev.substr(i, 2);
             update_devkey_device.devKey[i / 2] = std::stoi(hexByte, nullptr, 16);
@@ -4455,7 +4455,7 @@ int BleProtocol::UpdateDeviceKeyGateway(uint16_t gwAddr, string devKeyDev)
             .header = 0x12,
             .devAddr = gwAddr};
         update_devkey_device.element = 0x0001;
-        for (int i = 0; i < devKeyDev.length(); i += 2)
+        for (size_t i = 0; i < devKeyDev.length(); i += 2)
         {
             std::string hexByte = devKeyDev.substr(i, 2);
             update_devkey_device.devKey[i / 2] = std::stoi(hexByte, nullptr, 16);
@@ -4486,7 +4486,7 @@ int BleProtocol::UpdateNetKey(uint16_t gwAddr, string netKey, uint32_t indexId)
         set_netkey_message_t set_netkey_message;
         memset(&set_netkey_message, 0x00, sizeof(set_netkey_message));
         set_netkey_message.opcode = HCI_GATEWAY_CMD_SET_PRO_PARA;
-        for (int i = 0; i < netKey.length(); i += 2)
+        for (size_t i = 0; i < netKey.length(); i += 2)
         {
             std::string hexByte = netKey.substr(i, 2);
             set_netkey_message.netKey[i / 2] = std::stoi(hexByte, nullptr, 16);
@@ -4520,7 +4520,7 @@ int BleProtocol::UpdateDevKey(uint16_t gwAddr, string devKey)
         set_gwkey_message_t set_gwkey_message;
         set_gwkey_message.opcode = 0x0D;
         set_gwkey_message.gwAddr = (gwAddr);
-        for (int i = 0; i < devKey.length(); i += 2)
+        for (size_t i = 0; i < devKey.length(); i += 2)
         {
             std::string hexByte = devKey.substr(i, 2);
             set_gwkey_message.gwKey[i / 2] = std::stoi(hexByte, nullptr, 16);
@@ -4551,7 +4551,7 @@ int BleProtocol::UpdateAppKey(string appKey)
         binding_all_message_t binding_all_message;
         memset(&binding_all_message, 0x00, sizeof(binding_all_message));
         binding_all_message.opcode = HCI_GATEWAY_CMD_START_KEYBIND;
-        for (int i = 0; i < appKey.length(); i += 2)
+        for (size_t i = 0; i < appKey.length(); i += 2)
         {
             std::string hexByte = appKey.substr(i, 2);
             binding_all_message.appKey[i / 2] = std::stoi(hexByte, nullptr, 16);

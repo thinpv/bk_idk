@@ -527,7 +527,7 @@ Json::Value Util::arrangeJson(Json::Value &property)
 	if (property.isArray())
 	{
 		vector<Json::Value> listProperties;
-		for (int numProperty = 0; numProperty < property.size(); numProperty++)
+		for (size_t numProperty = 0; numProperty < property.size(); numProperty++)
 		{
 			if (property[numProperty].isObject())
 			{
@@ -536,7 +536,7 @@ Json::Value Util::arrangeJson(Json::Value &property)
 		}
 		std::sort(listProperties.begin(), listProperties.end(), Util::compareByID);
 		Json::Value result;
-		for (int i = 0; i < listProperties.size(); i++)
+		for (size_t i = 0; i < listProperties.size(); i++)
 		{
 			result.append(listProperties[i]);
 		}

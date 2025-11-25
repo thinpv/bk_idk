@@ -33,7 +33,7 @@ int ModulePirLightSensorStartup::InputData(uint8_t *data, int len, Json::Value &
             pir = data_message->pir;
             lux = data_message->lux;
             BuildTelemetryValue(jsonValue);
-            uint16_t sceneId = data[5] | (data[6] << 8);
+            // uint16_t sceneId = data[5] | (data[6] << 8);
             return CODE_OK;
         }
     }

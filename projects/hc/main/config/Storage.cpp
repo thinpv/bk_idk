@@ -12,7 +12,7 @@
 #include "ErrorCode.h"
 // #include "common.h"
 
-const static char *TAG = "Storage";
+// const static char *TAG = "Storage";
 
 Storage *Storage::GetInstance()
 {

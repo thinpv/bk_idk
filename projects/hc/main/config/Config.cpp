@@ -16,7 +16,7 @@
 #define SERVER_ADDR "34.126.108.182"
 #define SERVER_PORT 1883
 
-const static char *TAG = "Config";
+// const static char *TAG = "Config";
 
 config_t config_data =
 		{
@@ -145,7 +145,7 @@ int config_read()
 				Json::Value serialJson = payloadJson["serial"];
 				for (int i = 0; i < MAX_SERIAL_NUM; i++)
 				{
-					if (i < serialJson.size() && serialJson[i].isObject())
+					if (i < (int)serialJson.size() && serialJson[i].isObject())
 					{
 						Json::Value serialItem = serialJson[i];
 						if (serialItem.isMember("baudrate") && serialItem["baudrate"].isInt())
@@ -162,7 +162,7 @@ int config_read()
 			if (payloadJson.isMember("device") && payloadJson["device"].isArray())
 			{
 				Json::Value devicesJson = payloadJson["device"];
-				for (int i = 0; i < devicesJson.size(); i++)
+				for (size_t i = 0; i < devicesJson.size(); i++)
 				{
 					Json::Value deviceItem = devicesJson[i];
 					// DeviceManager::GetInstance()->AddNewModbusDevice(deviceItem);

@@ -278,8 +278,8 @@ int Gateway::CheckOnlineThread()
 {
 	LOGI("Start CheckOnlineThread");
 	time_t currentTime = 0;
-	time_t oldTime = 0;
-	time_t oldTimeCheckStatus = 0;
+	// time_t oldTime = 0;
+	// time_t oldTimeCheckStatus = 0;
 	uint32_t allTimeCheck = 0; // time total in a loop check
 	bool deviceStateChange = false;
 

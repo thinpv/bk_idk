@@ -191,7 +191,7 @@ bool ModuleRgb::CheckData(Json::Value &dataValue, bool &rs)
 				{
 					int g1 = listValue[0].asInt();
 					int g2 = listValue[1].asInt();
-					rs = Util::CompareNumber(op, this->g, g1, g1);
+					rs = Util::CompareNumber(op, this->g, g1, g2);
 					return true;
 				}
 			}
