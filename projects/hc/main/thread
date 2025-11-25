@@ -1,0 +1,157 @@
+#pragma once
+
+#include <functional>
+#include <cstdint>
+#include <cstring>
+
+extern "C" {
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+}
+
+class thread {
+public:
+    using Function = std::function<void()>;
+
+    // stack_size in bytes, priority as FreeRTOS priority
+    thread(Function fn, const char* name = "cpp_thread", uint32_t stack_size_bytes = 2048, UBaseType_t priority = tskIDLE_PRIORITY + 1)
+        : fn_(fn),
+          name_(nullptr),
+          stack_size_bytes_(stack_size_bytes),
+          priority_(priority),
+          task_handle_(nullptr),
+          join_sem_(nullptr),
+          started_(false),
+          detached_(false)
+    {
+        if (name) {
+            name_ = static_cast<char*>(pvPortMalloc(strlen(name) + 1));
+            if (name_) strcpy(name_, name);
+        }
+        // create a binary semaphore for join (initially empty)
+        join_sem_ = xSemaphoreCreateBinary();
+    }
+
+    // Non-copyable
+    thread(const thread&) = delete;
+    thread& operator=(const thread&) = delete;
+
+    // Movable (optional) - simple move
+    thread(thread&& other) noexcept
+        : fn_(std::move(other.fn_)),
+          name_(other.name_),
+          stack_size_bytes_(other.stack_size_bytes_),
+          priority_(other.priority_),
+          task_handle_(other.task_handle_),
+          join_sem_(other.join_sem_),
+          started_(other.started_),
+          detached_(other.detached_)
+    {
+        other.name_ = nullptr;
+        other.task_handle_ = nullptr;
+        other.join_sem_ = nullptr;
+        other.started_ = false;
+        other.detached_ = false;
+    }
+
+    thread& operator=(thread&&) = delete; // keep simple
+
+    ~thread() {
+        // If not detached and started, caller should join before destroying.
+        // Try to clean up resources if possible
+        if (name_) {
+            vPortFree(name_);
+            name_ = nullptr;
+        }
+        if (join_sem_) {
+            // If someone still holds task handle, deleting semaphore now might be unsafe.
+            vSemaphoreDelete(join_sem_);
+            join_sem_ = nullptr;
+        }
+    }
+
+    // start the thread (one-shot)
+    bool start() {
+        if (started_) return false;
+        // FreeRTOS xTaskCreate stack depth is in words (StackType_t), so convert bytes -> words
+        const uint32_t stack_words = (stack_size_bytes_ + sizeof(StackType_t) - 1) / sizeof(StackType_t);
+
+        // pass 'this' as parameter to trampoline
+        BaseType_t res = xTaskCreate(&thread::task_trampoline,
+                                     name_ ? name_ : "cpp_thread",
+                                     static_cast<uint16_t>(stack_words),
+                                     this,
+                                     priority_,
+                                     &task_handle_);
+        if (res != pdPASS) {
+            task_handle_ = nullptr;
+            return false;
+        }
+        started_ = true;
+        return true;
+    }
+
+    // join: block until thread finishes. If already detached, join is invalid.
+    // timeout_ms: portMAX_DELAY to wait forever
+    bool join(TickType_t timeout_ticks = portMAX_DELAY) {
+        if (!started_ || detached_) return false;
+        if (join_sem_ == nullptr) return false;
+        // Wait for task to signal completion
+        if (xSemaphoreTake(join_sem_, timeout_ticks) == pdTRUE) {
+            // Task finished, we can delete task handle resource already freed by the task itself.
+            return true;
+        }
+        return false;
+    }
+
+    // detach: mark detached, caller won't be able to join
+    void detach() {
+        detached_ = true;
+        // We won't delete join semaphore here; task will still give semaphore on exit.
+    }
+
+    // static helper
+    static void sleep_ms(uint32_t ms) {
+        vTaskDelay(pdMS_TO_TICKS(ms));
+    }
+
+    // if you need to get underlying handle
+    TaskHandle_t native_handle() const { return task_handle_; }
+
+private:
+    Function fn_;
+    char* name_;
+    uint32_t stack_size_bytes_;
+    UBaseType_t priority_;
+    TaskHandle_t task_handle_;
+    SemaphoreHandle_t join_sem_;
+    bool started_;
+    bool detached_;
+
+    // trampoline: static C function used as task entry
+    static void task_trampoline(void* param) {
+        thread* self = static_cast<thread*>(param);
+        if (!self) {
+            vTaskDelete(nullptr);
+            return;
+        }
+
+        // Execute user function (catch-all: do not throw)
+        // NOTE: SDK typically compiles with -fno-exceptions, so ensure fn_ won't throw.
+        try {
+            self->fn_();
+        } catch (...) {
+            // If exceptions disabled, this won't be used — but keep safe
+        }
+
+        // signal join semaphore if exists and not detached
+        if (self->join_sem_) {
+            xSemaphoreGive(self->join_sem_);
+        }
+
+        // If detached, we still delete this task.
+        // Task must delete itself
+        vTaskDelete(nullptr);
+    }
+};

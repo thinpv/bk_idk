@@ -1,0 +1,30 @@
+# Kconfig file
+
+menu "SMH configuration"
+
+    config SMH
+        bool "Enable SMH"
+        default n
+
+    config ENABLE_ZIGBEE
+        bool "Enable Zigbee feature"
+        depends on SMH
+        default n
+        help
+            Can connect to ZIGBEE devices
+
+    config ENABLE_BLE
+        bool "Enable BLE feature"
+        depends on SMH
+        default n
+        help
+            Can connect to BLE devices
+
+    config ENABLE_LOCAL_BLE
+        bool "Enable integrated BLE feature"
+        depends on SMH
+        default n
+        help
+            Can connect to BLE devices
+
+endmenu

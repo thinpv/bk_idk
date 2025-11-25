@@ -1,0 +1,39 @@
+#pragma once
+// #include "rtos.h"   // hoặc "FreeRTOS.h" + "semphr.h"
+#include "sys_rtos.h"
+
+class mutex {
+public:
+    mutex() {
+        rtos_init_semaphore(&sem_, 1);
+    }
+
+    ~mutex() {
+        rtos_deinit_semaphore(&sem_);
+    }
+
+    void lock() {
+        rtos_get_semaphore(&sem_, BEKEN_WAIT_FOREVER);
+    }
+
+		bool try_lock() {
+				return rtos_get_semaphore(&sem_, 0) == kNoErr;
+		}
+
+    void unlock() {
+        rtos_set_semaphore(&sem_);
+    }
+
+private:
+    beken_semaphore_t sem_;
+};
+
+// RAII guard cho tiện
+class LockGuard {
+public:
+    explicit LockGuard(mutex& m) : m_(m) { m_.lock(); }
+    ~LockGuard() { m_.unlock(); }
+
+private:
+    mutex& m_;
+};
